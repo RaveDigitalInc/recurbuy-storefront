@@ -1,0 +1,69 @@
+{
+  "name": "@recurbuy/storefront-eds",
+  "version": "0.2.0",
+  "description": "RecurBuy subscription drop-in for Adobe Commerce Storefront (EDS, aem-boilerplate-commerce v11+). Installed under the npm alias @dropins/storefront-recurbuy so stock install:dropins vendors it.",
+  "type": "module",
+  "sideEffects": [
+    "./styles/recurbuy-storefront.css"
+  ],
+  "main": "./api.js",
+  "module": "./api.js",
+  "bin": {
+    "recurbuy-eds": "./bin/recurbuy-eds.js"
+  },
+  "exports": {
+    ".": "./api.js",
+    "./api.js": "./api.js",
+    "./render.js": "./render.js",
+    "./graphql.js": "./graphql.js",
+    "./containers/SubscriptionsList.js": "./containers/SubscriptionsList.js",
+    "./extend/initializer.js": "./extend/initializer.js",
+    "./styles/recurbuy-storefront.css": "./styles/recurbuy-storefront.css",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "api.js",
+    "render.js",
+    "graphql.js",
+    "bin",
+    "cli",
+    "containers",
+    "extend",
+    "src",
+    "styles",
+    "templates",
+    "README.md"
+  ],
+  "scripts": {
+    "recurbuy-eds": "node ./bin/recurbuy-eds.js",
+    "lint": "eslint --ext .js .",
+    "verify:install": "node ./scripts/verify-install.mjs"
+  },
+  "peerDependencies": {
+    "@dropins/storefront-cart": ">=3.0.0",
+    "@dropins/storefront-pdp": ">=3.0.0",
+    "@dropins/tools": ">=2.0.0"
+  },
+  "keywords": [
+    "recurbuy",
+    "subscriptions",
+    "adobe-commerce",
+    "eds",
+    "dropins"
+  ],
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/grinevich-gif/recurbuy-storefront.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@babel/core": "7.26.0",
+    "@babel/eslint-parser": "7.25.9",
+    "eslint": "8.57.1",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-plugin-import": "2.31.0"
+  }
+}

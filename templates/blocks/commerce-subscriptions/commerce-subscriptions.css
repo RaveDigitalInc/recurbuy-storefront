@@ -1,0 +1,22 @@
+/* Keep account Columns layout stable: wide table must not squeeze the sidebar. */
+.commerce-subscriptions-wrapper,
+.commerce-subscriptions {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+  body.columns main > .section.commerce-subscriptions-container,
+  body.columns main > .section.commerce-account-header-container {
+    min-width: 0;
+    max-width: var(--column-width);
+  }
+
+  body.columns main > .section.commerce-account-sidebar-container {
+    flex: 0 0 var(--column-width);
+    max-width: var(--column-width);
+    min-width: 0;
+  }
+}
