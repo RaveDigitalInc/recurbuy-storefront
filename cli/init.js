@@ -4,14 +4,13 @@ import { fileURLToPath } from 'node:url';
 import {
   DEFAULT_DEP_KEY,
   ensureAliasDependency,
-  ensureBuildMjsCartFragment,
   REQUIRED_CONFIG_KEYS,
-  ensureImportMap,
   loadPackageJson,
   readText,
   resolvePath,
   writeText,
 } from './lib.js';
+import { applySuitePatches, DEFAULT_SUITE } from './apply-patches.js';
 import { runEnsureStorefrontExtras } from './storefront-extras.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,10 +30,10 @@ function readConfigDefaults(cwd) {
 }
 
 /**
- * @param {{ cwd: string, dryRun?: boolean }} options
+ * @param {{ cwd: string, dryRun?: boolean, suite?: string }} options
  */
 export function runInit(options) {
-  const { cwd, dryRun = false } = options;
+  const { cwd, dryRun = false, suite = DEFAULT_SUITE } = options;
   const report = [];
   const warnings = [];
 
@@ -51,47 +50,10 @@ export function runInit(options) {
     report.push(`package.json: ${DEFAULT_DEP_KEY} already present`);
   }
 
-  // 2) head.html import map
-  const headPath = resolvePath(cwd, 'head.html');
-  if (!fs.existsSync(headPath)) {
-    warnings.push('head.html not found — add import map manually (see README)');
-  } else {
-    const head = readText(headPath);
-    const mapped = ensureImportMap(head);
-    if (mapped.missingAnchor) {
-      warnings.push('head.html: could not find import map — add RecurBuy entries manually');
-    } else if (mapped.changed) {
-      report.push('head.html: import map entries');
-      if (!dryRun) writeText(headPath, mapped.source);
-    } else {
-      report.push('head.html: import map already OK');
-    }
-  }
-
-  // 3) build.mjs GraphQL fragment
-  const buildPath = resolvePath(cwd, 'build.mjs');
-  if (!fs.existsSync(buildPath)) {
-    warnings.push('build.mjs not found — add cart custom_attributes fragment manually');
-  } else {
-    const build = readText(buildPath);
-    const next = ensureBuildMjsCartFragment(build);
-    if (next.missingAnchor) {
-      warnings.push('build.mjs: could not inject cart fragment — see README');
-    } else if (next.alreadyPresent) {
-      report.push('build.mjs: custom_attributes already present');
-    } else if (next.changed) {
-      report.push('build.mjs: cart custom_attributes fragment');
-      if (!dryRun) writeText(buildPath, next.source);
-    }
-  }
-
-  // 4) cart initializer loads RecurBuy
-  const cartInitPath = resolvePath(cwd, 'scripts', 'initializers', 'cart.js');
-  if (!fs.existsSync(cartInitPath)) {
-    warnings.push('scripts/initializers/cart.js not found');
-  } else {
-    patchCartInitializer(cartInitPath, { dryRun, report });
-  }
+  // 2–4) stock files via versioned unified patches (not regex)
+  const patched = applySuitePatches({ cwd, suite, dryRun });
+  patched.report.forEach((line) => report.push(line));
+  patched.warnings.forEach((line) => warnings.push(line));
 
   // 5) RecurBuy initializer (new file)
   const recurbuyInitPath = resolvePath(cwd, 'scripts', 'initializers', 'recurbuy.js');
@@ -131,31 +93,9 @@ export function runInit(options) {
   report.push('Next:');
   report.push('  1. npm run install:dropins');
   report.push('  2. Enter the 2 values above in config.json');
-  report.push('  3. Publish the /customer/subscriptions page (init may have created the HTML)');
+  report.push('  3. Publish the /customer/subscriptions page (or use account auto-mount when available)');
   report.push('  4. npx recurbuy-eds doctor');
   report.push('  5. RecurBuy panel: Connection + AccS webhooks + subscription options on products');
 
-  return { report, warnings };
-}
-
-/**
- * The single stock touch: the cart initializer loads the RecurBuy initializer.
- * @param {string} filePath
- * @param {{ dryRun: boolean, report: string[] }} ctx
- */
-function patchCartInitializer(filePath, ctx) {
-  const source = readText(filePath);
-  const loaderImport = "import './recurbuy.js';";
-  if (source.includes(loaderImport)) {
-    ctx.report.push('scripts/initializers/cart.js: already loads RecurBuy');
-    return;
-  }
-
-  const imports = [...source.matchAll(/^import[\s\S]*?from\s+['"][^'"]+['"];[ \t]*\n/gm)];
-  const last = imports[imports.length - 1];
-  const at = last ? last.index + last[0].length : 0;
-  ctx.report.push('scripts/initializers/cart.js: load RecurBuy initializer');
-  if (!ctx.dryRun) {
-    writeText(filePath, `${source.slice(0, at)}${loaderImport}\n${source.slice(at)}`);
-  }
+  return { report, warnings, failed: patched.failed };
 }

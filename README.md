@@ -39,13 +39,13 @@ npm run install:dropins          # vendors the drop-in + applies the build.mjs f
 npx recurbuy-eds doctor
 ```
 
-`init` leaves stock `decorate()` bodies alone. It:
+`init` leaves stock `decorate()` bodies alone. Stock touch points use **versioned unified patches** under `patches/<suite>/` (default suite `b2c-september-2026`), not regex rewrites:
 
-- adds import map entries to `head.html`
-- adds the `custom_attributes` cart fragment to `build.mjs` (2 lines)
-- adds **one** load line: `import './recurbuy.js'` in `scripts/initializers/cart.js`
-- copies `scripts/initializers/recurbuy.js` + the `commerce-subscriptions` block
-- creates subscriptions page stub + empty `subscriptions-*` keys in `config.json`
+- `head.html` — import map entries
+- `build.mjs` — `custom_attributes` cart fragment
+- `scripts/initializers/cart.js` — `import './recurbuy.js'`
+
+If a file no longer matches the suite, apply fails loudly (`--suite=…` or manual lines in README). `init` also copies `scripts/initializers/recurbuy.js` + the `commerce-subscriptions` block and creates subscriptions page stub + empty `subscriptions-*` keys in `config.json`.
 
 At runtime RecurBuy uses Adobe extension points only:
 

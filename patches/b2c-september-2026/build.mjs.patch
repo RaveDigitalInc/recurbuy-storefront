@@ -1,0 +1,16 @@
+--- a/build.mjs
++++ b/build.mjs
+@@ -1,11 +1,12 @@
+ import { overrideGQLOperations } from '@dropins/build-tools/gql-extend.js';
++import { CART_ITEM_CUSTOM_ATTRIBUTES_OPERATION } from '@dropins/storefront-recurbuy/graphql.js';
+ 
+ overrideGQLOperations([
+   // ACCS does not have Downloadable Items
+   {
+     npm: '@dropins/storefront-cart',
+     skipFragments: ['DOWNLOADABLE_CART_ITEMS_FRAGMENT'],
+-    operations: [],
++    operations: [CART_ITEM_CUSTOM_ATTRIBUTES_OPERATION],
+   },
+   {
+     npm: '@dropins/storefront-order',

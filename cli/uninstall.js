@@ -79,9 +79,23 @@ export function runUninstall(options) {
       report.push('delete scripts/initializers/recurbuy.js');
       if (!dryRun) fs.unlinkSync(initializerPath);
     }
-    warnings.push('blocks/commerce-subscriptions left in place (may be referenced by content)');
+    const blockPath = resolvePath(cwd, 'blocks', 'commerce-subscriptions');
+    if (fs.existsSync(blockPath)) {
+      report.push('delete blocks/commerce-subscriptions');
+      if (!dryRun) fs.rmSync(blockPath, { recursive: true, force: true });
+    }
+    const dropinPath = resolvePath(cwd, 'scripts', '__dropins__', 'storefront-recurbuy');
+    if (fs.existsSync(dropinPath)) {
+      report.push('delete scripts/__dropins__/storefront-recurbuy');
+      if (!dryRun) fs.rmSync(dropinPath, { recursive: true, force: true });
+    }
+    const stubPath = resolvePath(cwd, 'content', 'customer', 'subscriptions.html');
+    if (fs.existsSync(stubPath)) {
+      report.push('delete content/customer/subscriptions.html');
+      if (!dryRun) fs.unlinkSync(stubPath);
+    }
   } else {
-    warnings.push('scripts/initializers/recurbuy.js kept — pass --remove-files to delete it');
+    warnings.push('scripts/initializers/recurbuy.js kept — pass --remove-files to delete scaffold files');
   }
 
   report.push('Re-run npm run install:dropins after dependency change');

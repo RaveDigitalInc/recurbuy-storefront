@@ -5,6 +5,7 @@
  * init -> install:dropins -> doctor, a stock-file diff check and an uninstall.
  *
  * Usage: npm run verify:install -- [--ref <git ref>] [--dir <path>] [--keep]
+ * Default --ref is b2c-september-2026 (matches patches/ suite).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -31,7 +32,8 @@ const option = (name, fallback) => {
   const index = args.indexOf(name);
   return index === -1 ? fallback : args[index + 1];
 };
-const ref = option('--ref', 'main');
+// Match patches/b2c-september-2026 (stock aem-boilerplate-commerce suite tag).
+const ref = option('--ref', 'b2c-september-2026');
 const keep = args.includes('--keep');
 const workDir = option('--dir', fs.mkdtempSync(path.join(os.tmpdir(), 'recurbuy-verify-')));
 
