@@ -1,5 +1,6 @@
 import { getValidSubscriptionConfig, SUBSCRIPTION_REQUEST_TIMEOUT_MS } from '../config.js';
 import { mapStorefrontCheckoutConfigPayload } from './storefront-checkout-config-mapper.js';
+import { storefrontRequestHeaders } from './storefront-request-headers.js';
 
 /**
  * Fetches mixed-cart checkout flags from the RecurBuy storefront API.
@@ -33,10 +34,7 @@ export async function fetchCheckoutConfig(cartId) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       credentials: 'omit',
-      headers: {
-        Accept: 'application/json',
-        'X-RecurBuy-Connection-Token': config.connectionToken,
-      },
+      headers: storefrontRequestHeaders({ includeShopper: false }),
       signal: controller.signal,
     });
 

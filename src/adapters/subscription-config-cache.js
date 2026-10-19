@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_REQUEST_TIMEOUT_MS, getValidSubscriptionConfig } from '../config.js';
+import { storefrontRequestHeaders } from './storefront-request-headers.js';
 
 /** @type {Map<string, Record<string, unknown>>} */
 const payloadCache = new Map();
@@ -83,10 +84,7 @@ async function requestSubscriptionConfig(productId) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       credentials: 'omit',
-      headers: {
-        Accept: 'application/json',
-        'X-RecurBuy-Connection-Token': config.connectionToken,
-      },
+      headers: storefrontRequestHeaders({ includeShopper: false }),
       signal: controller.signal,
     });
 
