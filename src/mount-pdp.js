@@ -282,7 +282,7 @@ export function mountSubscriptionOnPdp({
       standardRegularPrice,
     } = resolveBundlePricedView();
 
-    const selectedPlan = eligibilityForUi?.plans?.find((plan) => plan.id === selection.planId)
+    const selectedPlan = eligibilityForUi?.plans?.find((plan) => String(plan.id) === String(selection.planId))
       || eligibilityForUi?.plans?.[0]
       || null;
     const showDetails = viewState === 'ready'
@@ -522,7 +522,7 @@ export function mountSubscriptionOnPdp({
     }
 
     const { eligibilityForUi } = resolveBundlePricedView();
-    const selectedPlan = eligibilityForUi?.plans?.find((plan) => plan.id === selection.planId)
+    const selectedPlan = eligibilityForUi?.plans?.find((plan) => String(plan.id) === String(selection.planId))
       || eligibilityForUi?.plans?.[0]
       || null;
 

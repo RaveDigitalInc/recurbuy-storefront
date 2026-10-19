@@ -247,6 +247,8 @@ export async function prepareSubscriptionCartItem(input) {
     ? selectionSkusFromAccsValues(lineValues, productData, selection)
     : [];
 
+  const catalogProductIdForConfig = productData?.externalId || productData?.id;
+  const cachedConfig = peekCachedSubscriptionConfig(catalogProductIdForConfig);
   let cartItem = CartPayloadAdapter.enrich(
     lineValues,
     selection,
@@ -254,6 +256,9 @@ export async function prepareSubscriptionCartItem(input) {
       parentSku: productData?.sku,
       selectedPlan: selection?.selectedPlan,
       accsCartMergeOptionUid: resolvedMergeUid,
+      planOptions: cachedConfig?.planOptions && typeof cachedConfig.planOptions === 'object'
+        ? /** @type {Record<string, unknown>} */ (cachedConfig.planOptions)
+        : null,
     },
   );
 

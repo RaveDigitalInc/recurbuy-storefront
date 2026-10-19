@@ -2,6 +2,7 @@ import {
   RECURBUY_SUBSCRIPTION_OPTION_ID,
 } from './contract.js';
 import { endsLabelFromPlanFacts } from './format.js';
+import { titleFromPlanOptions } from './helpers/plan-options-title.js';
 import { saveSelectionForSku } from './selection-store.js';
 
 /**
@@ -68,16 +69,23 @@ function withoutLegacyFakeMarkers(enteredOptions) {
 }
 
 /**
+ * Magento order/cart shows "{option title}: {value}". Prefer the plan label so
+ * merchants see "Subscription: Every month" instead of a raw option id.
+ * Option id stays on custom attributes / pending-add for pricing.
+ *
  * @param {EnteredOption[]} list
  * @param {string} mergeUid
  * @param {string|number} subscriptionOptionId
+ * @param {string} [displayLabel]
  * @returns {EnteredOption[]}
  */
-function withAccsCartMergeOption(list, mergeUid, subscriptionOptionId) {
+function withAccsCartMergeOption(list, mergeUid, subscriptionOptionId, displayLabel = '') {
   const uid = String(mergeUid || '').trim();
   if (!uid) return list;
 
-  const value = String(subscriptionOptionId);
+  const label = String(displayLabel || '').trim();
+  // Never send a bare option id — Magento order view shows this as the option value.
+  const value = label || `Plan ${subscriptionOptionId}`;
   const withoutPrior = list.filter((option) => option.uid !== uid);
   return [...withoutPrior, { uid, value }];
 }
@@ -98,6 +106,7 @@ export const CartPayloadAdapter = {
    *   parentSku?: string,
    *   selectedPlan?: import('./contract.js').SubscriptionPlan,
    *   accsCartMergeOptionUid?: string|null,
+   *   planOptions?: Record<string, unknown>|null,
    * }} [options]
    * @returns {ValuesModel & { parentSku?: string, enteredOptions?: EnteredOption[] }}
    */
@@ -160,10 +169,18 @@ export const CartPayloadAdapter = {
     saveSelectionForSku(sku, enrichedSelection);
 
     const optionId = selection.subscriptionOptionId || selection.optionId || selection.planId;
+    const fromPlanOptions = titleFromPlanOptions(options.planOptions, optionId);
+    const displayLabel = String(
+      plan?.label
+      || enrichedSelection.planSnapshot?.planLabel
+      || fromPlanOptions
+      || '',
+    ).trim();
     cleanEnteredOptions = withAccsCartMergeOption(
       cleanEnteredOptions,
       options.accsCartMergeOptionUid,
       optionId,
+      displayLabel,
     );
 
     if (cleanEnteredOptions.length) {
