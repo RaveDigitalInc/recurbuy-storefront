@@ -3,9 +3,8 @@
  * cart-line uid, plus the panel checkout copy for the order summary.
  */
 
-import { getCartData } from '@dropins/storefront-cart/api.js';
 import { fetchCheckoutConfig } from '../adapters/storefront-checkout-config-adapter.js';
-import { nudgeQuantity } from '../cart-item-attributes.js';
+import { scheduleBundleCatalogReprice } from '../bundle-reprice.js';
 import { syncCartSubscriptionDetails } from '../cart-subscription-details.js';
 
 /**
@@ -22,50 +21,40 @@ export function createCartDetailsStore({ getCartItems }) {
   let checkoutConfigCartId = null;
 
   /**
-   * Force AccS to re-save bundle selections when GraphQL still shows
-   * catalog/sale while the stamped/synced plan unit is lower.
-   * @returns {Promise<boolean>} true when a line was nudged
+   * Schedule a background bundle re-save when this cart payload still shows
+   * the catalog child-sum. Painting does not wait for it.
+   * @param {Array<{ uid?: string, quantity?: number, price?: { value?: number } }>} list
+   * @param {Map<string, { purchaseType?: string, price?: { value?: number } }>} details
+   * @param {string|null|undefined} cartId
    */
-  const repriceBundles = async (list, details) => {
-    const cartId = (await getCartData())?.id;
-    if (!cartId || typeof cartId !== 'string') return false;
+  const repriceBundles = (list, details, cartId) => {
+    if (!cartId) return;
 
-    const targets = [...details.entries()].filter(([uid, entry]) => {
-      if (bundleRepriceAttempted.has(uid)) return false;
-      if (entry?.purchaseType !== 'subscription') return false;
+    details.forEach((entry, uid) => {
+      if (bundleRepriceAttempted.has(uid)) return;
+      if (entry?.purchaseType !== 'subscription') return;
       const planValue = entry.price?.value;
-      if (!(typeof planValue === 'number' && planValue > 0)) return false;
+      if (!(typeof planValue === 'number' && planValue > 0)) return;
       const item = list.find((line) => line?.uid === uid);
-      if (!item || item.itemType !== 'BundleCartItem') return false;
+      if (!item || item.itemType !== 'BundleCartItem') return;
       const magento = item.price?.value;
-      return typeof magento === 'number' && magento > planValue * 1.15;
-    });
+      if (!(typeof magento === 'number' && magento > planValue * 1.15)) return;
 
-    const results = await Promise.all(targets.map(async ([uid]) => {
-      const item = list.find((line) => line?.uid === uid);
-      if (!item) return false;
       bundleRepriceAttempted.add(uid);
-      const qty = Number(item.quantity) || 1;
-      try {
-        await nudgeQuantity(cartId, uid, qty + 1);
-        await nudgeQuantity(cartId, uid, qty);
-        return true;
-      } catch {
-        // Display still uses the stamped/synced plan unit.
-        return false;
-      }
-    }));
-    return results.some(Boolean);
+      scheduleBundleCatalogReprice({
+        cartId,
+        itemUid: uid,
+        quantity: Number(item.quantity) || 1,
+        planUnitValue: planValue,
+        magentoUnit: magento,
+      });
+    });
   };
 
-  const refreshDetails = async (items) => {
-    let list = items || getCartItems() || [];
-    let next = await syncCartSubscriptionDetails(list, detailsByUid);
-
-    if (await repriceBundles(list, next)) {
-      list = getCartItems() || list;
-      next = await syncCartSubscriptionDetails(list, detailsByUid);
-    }
+  const refreshDetails = async (items, cartId) => {
+    const list = items || getCartItems() || [];
+    const next = await syncCartSubscriptionDetails(list, detailsByUid);
+    repriceBundles(list, next, cartId);
 
     detailsByUid.clear();
     next.forEach((details, uid) => detailsByUid.set(uid, details));
@@ -87,7 +76,7 @@ export function createCartDetailsStore({ getCartItems }) {
      */
     async syncFromCartData(cartData) {
       try {
-        await refreshDetails(cartData?.items);
+        await refreshDetails(cartData?.items, cartData?.id);
       } catch (error) {
         console.error('Error syncing cart subscription details:', error);
       }

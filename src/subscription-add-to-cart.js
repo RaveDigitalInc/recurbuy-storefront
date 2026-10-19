@@ -12,37 +12,21 @@ import {
 import { selectionSkusFromAccsValues } from './bundle-price.js';
 import { CartPayloadAdapter } from './cart-payload-adapter.js';
 import {
+  bundleLineCatalogUnit,
+  scheduleBundleCatalogReprice,
+} from './bundle-reprice.js';
+import {
   findItemUid,
   setSubscriptionAttributes,
-  nudgeQuantity,
 } from './cart-item-attributes.js';
 import { saveSelectionForSku, saveSelectionForUid } from './selection-store.js';
 
 /**
- * @param {string} cartId
- * @param {string} itemUid
- * @param {number} quantity
- * @param {number} planUnitValue
- */
-async function repriceBundleIfStillCatalog(cartId, itemUid, quantity, planUnitValue) {
-  try {
-    const cart = await getCartData();
-    const line = (cart?.items || []).find((entry) => entry?.uid === itemUid);
-    if (!line || line.itemType !== 'BundleCartItem') return;
-    const magento = typeof line.price?.value === 'number' ? line.price.value : null;
-    if (magento == null || !(magento > planUnitValue * 1.15)) return;
-
-    await nudgeQuantity(cartId, itemUid, quantity + 1);
-    await nudgeQuantity(cartId, itemUid, quantity);
-  } catch {
-    // Best-effort: stamped plan unit still paints the mini-cart after navigation.
-  }
-}
-
-/**
  * AccS GraphQL: sales_quote_item_save_before runs on addProductsToCart
  * *before* setCustomAttributesOnCartItem. Pending-add is required so the
- * price webhook knows the option on first save. Attrs+nudge remain as backup.
+ * price webhook knows the option on first save. Attributes are written
+ * before the add promise resolves. A bundle still on the catalog child-sum
+ * is re-saved after that, without holding the shopper on the button.
  *
  * Mixed one-time + subscription of the same variant: Magento SARP uses
  * addCustomOption('aw_sarp2_subscription_type'). AccS equivalent is a real
@@ -188,8 +172,16 @@ async function registerPendingSubscription(
  * @param {string|number} subscriptionOptionId
  * @param {Object} selection
  * @param {number} quantity
+ * @param {Object|null|undefined} cart Cart already returned by addProductsToCart
  */
-async function persistSubscriptionLine(cartId, itemUid, subscriptionOptionId, selection, quantity) {
+async function persistSubscriptionLine(
+  cartId,
+  itemUid,
+  subscriptionOptionId,
+  selection,
+  quantity,
+  cart,
+) {
   const snapshot = selection?.planSnapshot || {};
   const startDate = selection?.startDate
     || selection?.subscriptionStartDate
@@ -207,12 +199,18 @@ async function persistSubscriptionLine(cartId, itemUid, subscriptionOptionId, se
     planUnit,
   });
 
-  // Pending-add already priced the line on addProductsToCart. A same-qty
-  // updateCartItems still round-trips Magento (~2–3s) and does not change qty.
-  // Bundles may still need a qty bump when Magento skipped selection saves.
+  // Bundle child saves are sometimes skipped, so the add response can still
+  // show the catalog child-sum. Re-save after this function returns — the
+  // shopper must not wait on another full quote collect.
   const qty = quantity || 1;
   if (planUnit && typeof planUnit.value === 'number' && planUnit.value > 0) {
-    await repriceBundleIfStillCatalog(cartId, itemUid, qty, planUnit.value);
+    scheduleBundleCatalogReprice({
+      cartId,
+      itemUid,
+      quantity: qty,
+      planUnitValue: planUnit.value,
+      magentoUnit: bundleLineCatalogUnit(cart, itemUid),
+    });
   }
 }
 
@@ -342,6 +340,7 @@ export async function prepareSubscriptionCartItem(input) {
         mode === 'update'
           ? (cartItem.quantity || 1)
           : quantityOnLine(currentCart, targetUid, cartItem.quantity),
+        currentCart,
       );
 
       if (args.refresh !== false && typeof refreshCart === 'function') {

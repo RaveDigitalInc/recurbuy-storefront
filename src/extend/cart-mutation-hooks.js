@@ -4,7 +4,6 @@
  * mutation (pending-add + merge option) and finalizes the line afterwards.
  */
 
-import { refreshCart } from '@dropins/storefront-cart/api.js';
 import { captureCartLineAttributes } from '../cart-line-custom-attributes.js';
 import { prepareSubscriptionCartItem } from '../subscription-add-to-cart.js';
 
@@ -196,11 +195,6 @@ async function afterAddToCart(requestInit, response) {
     })),
     Promise.resolve(),
   );
-
-  // The drop-in emits cart/data from this (pre-attributes) response; repaint after it.
-  setTimeout(() => {
-    refreshCart?.();
-  }, 0);
 
   return response;
 }

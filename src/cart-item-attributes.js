@@ -28,12 +28,22 @@ const SET_CUSTOM_ATTRIBUTES_MUTATION = `
   }
 `;
 
-const UPDATE_CART_ITEMS_MUTATION = `
-  mutation UpdateCartItems($cartId: String!, $cartItems: [CartItemUpdateInput!]!) {
-    updateCartItems(input: { cart_id: $cartId, cart_items: $cartItems }) {
-      cart {
-        id
-      }
+const REPRICE_BUNDLE_QUANTITY_MUTATION = `
+  mutation RepriceBundleQuantity(
+    $cartId: String!,
+    $itemUid: ID!,
+    $raised: Float!,
+    $restored: Float!
+  ) {
+    raised: updateCartItems(
+      input: { cart_id: $cartId, cart_items: [{ cart_item_uid: $itemUid, quantity: $raised }] }
+    ) {
+      cart { id }
+    }
+    restored: updateCartItems(
+      input: { cart_id: $cartId, cart_items: [{ cart_item_uid: $itemUid, quantity: $restored }] }
+    ) {
+      cart { id }
     }
   }
 `;
@@ -240,48 +250,30 @@ function pushAttribute(list, code, value) {
 }
 
 /**
- * Nudges cart item quantity to trigger save_before observer in Magento.
- * Acts as a price recalculation safety net if pending or first save was one-off.
+ * Force a bundle parent re-save and restore the shopper quantity in one
+ * GraphQL request. Two separate updateCartItems calls each recollect the quote.
  *
- * @param {string} cartId Masked Commerce cart ID
- * @param {string} itemUid GraphQL item UID (e.g., "MjE1")
- * @param {number} qty Current item quantity
- * @returns {Promise<Object>} GraphQL response data
+ * @param {string} cartId
+ * @param {string} itemUid
+ * @param {number} quantity Shopper quantity to restore
+ * @returns {Promise<Object|undefined>}
  */
-export async function nudgeQuantity(cartId, itemUid, qty) {
-  if (!cartId || !itemUid || !qty) {
-    throw new Error('[RecurBuy] Missing required parameters for nudgeQuantity.');
+export async function repriceBundleLineQuantity(cartId, itemUid, quantity) {
+  const restored = Number(quantity);
+  if (!cartId || !itemUid || !Number.isFinite(restored) || restored < 1) {
+    throw new Error('[RecurBuy] Missing required parameters for bundle reprice.');
   }
 
-  return setCartItemQuantity(cartId, itemUid, qty);
-}
-
-/**
- * Sets cart item quantity (use {@code 0} to remove the line).
- *
- * @param {string} cartId Masked Commerce cart ID
- * @param {string} itemUid GraphQL item UID
- * @param {number} qty New quantity ({@code 0} removes)
- * @returns {Promise<Object>} GraphQL response data
- */
-async function setCartItemQuantity(cartId, itemUid, qty) {
-  if (!cartId || !itemUid || qty == null || Number(qty) < 0) {
-    throw new Error('[RecurBuy] Missing required parameters for setCartItemQuantity.');
-  }
-
-  const response = await fetchGraphQl(UPDATE_CART_ITEMS_MUTATION, {
+  const response = await fetchGraphQl(REPRICE_BUNDLE_QUANTITY_MUTATION, {
     variables: {
       cartId,
-      cartItems: [
-        {
-          cart_item_uid: itemUid,
-          quantity: Number(qty),
-        },
-      ],
+      itemUid,
+      raised: restored + 1,
+      restored,
     },
   });
 
-  return readGraphQlData(response, 'updating cart item quantity');
+  return readGraphQlData(response, 'repricing bundle line');
 }
 
 /**
