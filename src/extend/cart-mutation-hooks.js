@@ -190,7 +190,10 @@ async function afterAddToCart(requestInit, response) {
   if (failed) return response;
 
   await finalizers.reduce(
-    (previous, finalize) => previous.then(() => finalize({ refresh: false })),
+    (previous, finalize) => previous.then(() => finalize({
+      refresh: false,
+      cartResult: result.cart,
+    })),
     Promise.resolve(),
   );
 

@@ -1,5 +1,6 @@
 import {
   getCartData,
+  getCartDataFromCache,
   createGuestCart,
   refreshCart,
 } from '@dropins/storefront-cart/api.js';
@@ -110,7 +111,18 @@ async function resolveAccsCartMergeOptionUid(productData, explicitUid = null) {
  *
  * @returns {Promise<string>}
  */
+function readCachedCart() {
+  try {
+    return getCartDataFromCache?.() || null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveCartId() {
+  const cachedId = readCachedCart()?.id;
+  if (cachedId) return String(cachedId);
+
   try {
     const cartData = await getCartData();
     if (cartData?.id) {
@@ -194,12 +206,11 @@ async function persistSubscriptionLine(cartId, itemUid, subscriptionOptionId, se
     endsLabel: snapshot.endsLabel,
     planUnit,
   });
-  const qty = quantity || 1;
-  await nudgeQuantity(cartId, itemUid, qty);
 
-  // AccS dynamic bundles often skip selection save_before when the same picks are
-  // already in the quote. GraphQL then keeps the catalog/sale child sum. A qty
-  // bump forces Magento to re-save children so the price webhook can plan-price them.
+  // Pending-add already priced the line on addProductsToCart. A same-qty
+  // updateCartItems still round-trips Magento (~2–3s) and does not change qty.
+  // Bundles may still need a qty bump when Magento skipped selection saves.
+  const qty = quantity || 1;
   if (planUnit && typeof planUnit.value === 'number' && planUnit.value > 0) {
     await repriceBundleIfStillCatalog(cartId, itemUid, qty, planUnit.value);
   }
@@ -289,8 +300,10 @@ export async function prepareSubscriptionCartItem(input) {
     };
   }
 
-  const cartId = await resolveCartId();
-  const cartBefore = await readCartQuietly();
+  const cartBefore = readCachedCart() || await readCartQuietly();
+  const cartId = cartBefore?.id
+    ? String(cartBefore.id)
+    : await resolveCartId();
   const subscriptionOptionId = await registerPendingSubscription(
     cartId,
     cartItem.sku,

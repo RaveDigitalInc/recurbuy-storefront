@@ -24,6 +24,10 @@ const HIDDEN_CART_LINE_ATTRIBUTE_CODES = new Set([
 /** @type {Map<string, CartLineAttribute[]>} */
 const attributesByUid = new Map();
 
+/** Uids from the latest cart GraphQL payload (lines without markers included). */
+/** @type {Set<string>|null} */
+let lastSeenLineUids = null;
+
 /**
  * @param {unknown} node
  * @param {number} depth
@@ -44,8 +48,14 @@ function collectCartLines(node, depth = 0) {
  * @param {unknown} data GraphQL `response.data`
  */
 export function captureCartLineAttributes(data) {
-  collectCartLines(data).forEach((line) => {
-    if (!line?.uid || !Array.isArray(line.custom_attributes)) return;
+  const lines = collectCartLines(data);
+  if (!lines.length && !hasItemsV2(data)) return;
+
+  lastSeenLineUids = new Set();
+  lines.forEach((line) => {
+    if (!line?.uid) return;
+    lastSeenLineUids.add(line.uid);
+    if (!Array.isArray(line.custom_attributes)) return;
     const attributes = line.custom_attributes
       .map((entry) => ({
         code: entry?.attribute_code?.trim(),
@@ -55,6 +65,32 @@ export function captureCartLineAttributes(data) {
     if (attributes.length) attributesByUid.set(line.uid, attributes);
     else attributesByUid.delete(line.uid);
   });
+}
+
+/**
+ * @param {string} uid
+ * @returns {CartLineAttribute[]}
+ */
+export function getCapturedLineAttributes(uid) {
+  return attributesByUid.get(uid) || [];
+}
+
+/**
+ * @returns {Set<string>|null}
+ */
+export function getLastSeenCartLineUids() {
+  return lastSeenLineUids;
+}
+
+/**
+ * @param {unknown} node
+ * @param {number} depth
+ * @returns {boolean}
+ */
+function hasItemsV2(node, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 3) return false;
+  if (Array.isArray(node.itemsV2?.items)) return true;
+  return Object.values(node).some((value) => hasItemsV2(value, depth + 1));
 }
 
 /**

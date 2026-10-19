@@ -1,5 +1,6 @@
 import {
   loadQuoteSubscriptionMarkers,
+  peekCapturedQuoteMarkers,
   subscriptionDetailsFromQuoteMarker,
 } from './adapters/quote-subscription-markers.js';
 import { fetchSubscriptionOptionList } from './adapters/storefront-options-list.js';
@@ -152,7 +153,8 @@ async function runCartSubscriptionSync(items, detailsByUid) {
   // AccS guest carts: do not call GET …/checkout/cart-items (REST 404 on masked
   // guest carts). Presentation lives on quote custom_attributes; options-list
   // only backfills titles for lines stamped before plan_label existed.
-  const quoteMarkers = await loadQuoteSubscriptionMarkers((await resolveCommerceCartId()) || '');
+  const quoteMarkers = peekCapturedQuoteMarkers(list)
+    ?? await loadQuoteSubscriptionMarkers((await resolveCommerceCartId()) || '');
 
   const titleProductIds = new Set();
   const resolved = await Promise.all(list.map(async (item) => {
