@@ -1,6 +1,7 @@
 /**
  * Resolve a merchant plan title from subscription-config {@code planOptions}.
- * Flat: `{ [optionId]: { title } }`. Nested configurable: `{ [productId]: { [optionId]: { title } } }`.
+ * Flat: `{ [optionId]: { title } }`.
+ * Nested configurable: `{ [productId]: { [optionId]: { title } } }`.
  *
  * @param {unknown} planOptions
  * @param {string|number|null|undefined} optionId

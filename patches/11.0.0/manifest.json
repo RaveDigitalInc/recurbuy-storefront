@@ -1,0 +1,28 @@
+{
+  "suite": "11.0.0",
+  "description": "Adobe Commerce storefront package.json version 11.0.0",
+  "match": {
+    "packageName": "@adobe/aem-boilerplate-commerce",
+    "packageVersions": ["11.0.0", "11.0.1", "11.0.2"]
+  },
+  "patches": [
+    {
+      "id": "cart-loader",
+      "version": 1,
+      "file": "scripts/initializers/cart.js",
+      "patch": "scripts.initializers.cart.js.patch"
+    },
+    {
+      "id": "import-map",
+      "version": 1,
+      "file": "head.html",
+      "patch": "head.html.patch"
+    },
+    {
+      "id": "build-cart-attrs",
+      "version": 1,
+      "file": "build.mjs",
+      "patch": "build.mjs.patch"
+    }
+  ]
+}

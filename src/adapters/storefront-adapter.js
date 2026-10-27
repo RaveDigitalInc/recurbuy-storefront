@@ -6,6 +6,7 @@ import {
 } from './storefront-pdp-mapper.js';
 import { fetchSubscriptionOptionList } from './storefront-options-list.js';
 import { storefrontRequestHeaders } from './storefront-request-headers.js';
+import { rememberCartLineOptionFromConfig } from '../helpers/cart-line-option.js';
 import {
   loadCachedSubscriptionConfig,
   peekCachedSubscriptionConfig,
@@ -89,6 +90,8 @@ function payloadNeedsOptionListTitles(payload) {
  * @returns {Promise<import('../contract.js').SubscriptionEligibilityResponse>}
  */
 async function mapPayloadToResponse(payload, request, productId) {
+  rememberCartLineOptionFromConfig(payload);
+
   // Skip options-list only when UI is on config AND plan titles are already present
   // (configurable AccS). Simple products need options-list for "Monthly 12 (50%)" etc.
   let optionList = null;

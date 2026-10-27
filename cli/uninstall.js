@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { removeInstallState } from './install-state.js';
 import {
   DEFAULT_DEP_KEY,
   IMPORT_MAP_ENTRIES,
@@ -96,6 +97,10 @@ export function runUninstall(options) {
     }
   } else {
     warnings.push('scripts/initializers/recurbuy.js kept — pass --remove-files to delete scaffold files');
+  }
+
+  if (removeInstallState(cwd, { dryRun })) {
+    report.push('delete .recurbuy-eds.json');
   }
 
   report.push('Re-run npm run install:dropins after dependency change');

@@ -375,12 +375,6 @@
 
 
 
-/* Cart Specific Attribute overrides (optional) */
-.dropin-cart-item .custom-attrs__list {
-    margin-top: var(--spacing-xxsmall);
-    font-size: var(--type-body-3-font-size, 12px);
-  }
-
 /* Subscription details (separate from catalog attributes) */
 .cart-subscription-details {
   margin-top: var(--spacing-xsmall);
@@ -477,10 +471,6 @@
 }
 
 
-
-.cart-mini-cart .custom-attrs__row--sku {
-  display: none;
-}
 
 .cart-mini-cart .dropin-cart-item__title,
 .cart-mini-cart .dropin-cart-item__sku {
@@ -737,43 +727,6 @@
     }
 }
 
-.custom-attrs__list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xxsmall);
-  margin: 0;
-  padding: 0;
-}
-
-.custom-attrs__row {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-xsmall);
-  font-size: var(--type-body-2-default-font);
-  line-height: 1.4;
-}
-
-.custom-attrs__row--sku {
-  font-weight: var(--type-body-1-strong-font);
-  color: var(--color-neutral-800);
-}
-
-.custom-attrs__label {
-  margin: 0;
-  font-weight: var(--type-body-1-strong-font);
-  color: var(--color-neutral-800);
-}
-
-.custom-attrs__value {
-  margin: 0;
-  color: var(--color-neutral-700);
-}
-
-.custom-attrs__empty {
-  display: none;
-}
-
-
 /* Magento aw_sarp2 customer subscriptions list — match account drop-in tokens */
 .recurbuy-subscriptions-list {
   width: 100%;
@@ -1023,6 +976,65 @@
   border-color: var(--color-alert-500, #db7070);
 }
 
+/* In-DOM prompts (replaces window.alert / window.confirm) */
+.recurbuy-user-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-medium, 1rem);
+  background: rgb(0 0 0 / 40%);
+}
+
+.recurbuy-user-prompt__panel {
+  width: min(100%, 24rem);
+  padding: var(--spacing-medium, 1rem);
+  border-radius: var(--shape-border-radius-2, 4px);
+  background: var(--color-neutral-50, #fff);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+}
+
+.recurbuy-user-prompt__message {
+  margin: 0 0 var(--spacing-medium, 1rem);
+  font: var(--type-body-1-default-font, inherit);
+  color: var(--color-neutral-800, #2d2d2d);
+}
+
+.recurbuy-user-prompt__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-small, 0.5rem);
+}
+
+.recurbuy-user-prompt__cancel,
+.recurbuy-user-prompt__confirm {
+  min-height: 2.25rem;
+  padding: 0 var(--spacing-medium, 1rem);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, #c2c2c2);
+  border-radius: var(--shape-border-radius-1, 2px);
+  background: var(--color-neutral-50, #fff);
+  cursor: pointer;
+  font: var(--type-button-2-font, inherit);
+}
+
+.recurbuy-user-prompt__confirm {
+  border-color: var(--color-brand-700, #376dce);
+  background: var(--color-brand-700, #376dce);
+  color: var(--color-neutral-50, #fff);
+}
+
+.recurbuy-user-prompt-error {
+  margin: 0 0 var(--spacing-small, 0.5rem);
+  padding: var(--spacing-small, 0.5rem) var(--spacing-medium, 1rem);
+  border: var(--shape-border-width-1, 1px) solid var(--color-alert-500, #db7070);
+  border-radius: var(--shape-border-radius-1, 2px);
+  background: var(--color-alert-100, #fcebeb);
+  color: var(--color-neutral-800, #2d2d2d);
+  font: var(--type-body-2-default-font, inherit);
+}
+
 @media (max-width: 899px) {
   .aw-sarp2-customer-subscriptions .data.table thead {
     display: none;
@@ -1055,9 +1067,4 @@
     color: var(--color-neutral-700);
     flex: 0 0 42%;
   }
-}
-
-/* Internal merge-key option rendered by the cart drop-in; never a shopper-facing row. */
-[data-recurbuy-merge-option="hidden"] {
-  display: none !important;
 }

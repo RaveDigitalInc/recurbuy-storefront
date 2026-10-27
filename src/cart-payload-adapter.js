@@ -1,8 +1,8 @@
-import {
-  RECURBUY_SUBSCRIPTION_OPTION_ID,
-} from './contract.js';
 import { endsLabelFromPlanFacts } from './format.js';
-import { titleFromPlanOptions } from './helpers/plan-options-title.js';
+import {
+  isHiddenCartLineOptionUid,
+  withoutHiddenCartLineEnteredOptions,
+} from './helpers/cart-line-option-data.js';
 import { saveSelectionForSku } from './selection-store.js';
 
 /**
@@ -12,8 +12,6 @@ import { saveSelectionForSku } from './selection-store.js';
  */
 
 /**
- * Normalizes input entered options into an array of EnteredOption objects.
- *
  * @param {unknown} enteredOptions
  * @returns {EnteredOption[]}
  */
@@ -38,65 +36,42 @@ function asEnteredOptionsList(enteredOptions) {
 }
 
 /**
- * Checks whether an entered option is a legacy/fake RecurBuy subscription marker.
- * AccS rejects non-catalog option UIDs — those must never be sent.
- *
- * @param {EnteredOption} option
- * @returns {boolean}
- */
-function isLegacyFakeSubscriptionMarker(option) {
-  const uid = option?.uid;
-  if (!uid) return false;
-  if (uid === RECURBUY_SUBSCRIPTION_OPTION_ID) return true;
-  try {
-    return atob(uid) === `custom-option/${RECURBUY_SUBSCRIPTION_OPTION_ID}`;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Filters out legacy RecurBuy fake markers, keeping genuine catalog options
- * (including the AccS merge-key field option).
- *
- * @param {unknown} enteredOptions
- * @returns {EnteredOption[]}
- */
-function withoutLegacyFakeMarkers(enteredOptions) {
-  return asEnteredOptionsList(enteredOptions).filter(
-    (option) => !isLegacyFakeSubscriptionMarker(option),
-  );
-}
-
-/**
- * Magento order/cart shows "{option title}: {value}". Prefer the plan label so
- * merchants see "Subscription: Every month" instead of a raw option id.
- * Option id stays on custom attributes / pending-add for pricing.
- *
  * @param {EnteredOption[]} list
- * @param {string} mergeUid
- * @param {string|number} subscriptionOptionId
- * @param {string} [displayLabel]
+ * @param {{ uid: string, value: string }|null|undefined} cartLineEntered
  * @returns {EnteredOption[]}
  */
-function withAccsCartMergeOption(list, mergeUid, subscriptionOptionId, displayLabel = '') {
-  const uid = String(mergeUid || '').trim();
-  if (!uid) return list;
-
-  const label = String(displayLabel || '').trim();
-  // Never send a bare option id — Magento order view shows this as the option value.
-  const value = label || `Plan ${subscriptionOptionId}`;
+function withCartLineEnteredOption(list, cartLineEntered) {
+  if (!cartLineEntered?.uid || !cartLineEntered?.value) {
+    return list;
+  }
+  const uid = String(cartLineEntered.uid).trim();
+  const value = String(cartLineEntered.value);
+  if (!uid || !value) return list;
   const withoutPrior = list.filter((option) => option.uid !== uid);
   return [...withoutPrior, { uid, value }];
 }
 
 /**
+ * @param {EnteredOption[]} list
+ * @param {string|null|undefined} cartLineUid
+ * @returns {EnteredOption[]}
+ */
+function withoutCartLineEnteredOption(list, cartLineUid) {
+  const uid = typeof cartLineUid === 'string' ? cartLineUid.trim() : '';
+  if (!uid) {
+    return list.filter((option) => !isHiddenCartLineOptionUid(option.uid));
+  }
+  return list.filter(
+    (option) => option.uid !== uid && !isHiddenCartLineOptionUid(option.uid),
+  );
+}
+
+/**
  * Prepares PDP cart item payloads for add-to-cart.
  *
- * AccS: legacy fake RecurBuy option UIDs are stripped. A real catalog field option
- * uid from subscription-config {@code accsCartMergeOption} is appended for
- * subscription lines so Magento does not qty-merge them onto one-time lines
- * (SARP {@code addCustomOption} parity).
+ * Subscription identity for AccS line merge uses catalog field entered_options
+ * ({@code cartLineOption.uid} + server {@code planOptions[].cartLineValue}).
+ * Presentation attrs are still stamped after add via finalize.
  */
 export const CartPayloadAdapter = {
   /**
@@ -105,8 +80,9 @@ export const CartPayloadAdapter = {
    * @param {{
    *   parentSku?: string,
    *   selectedPlan?: import('./contract.js').SubscriptionPlan,
-   *   accsCartMergeOptionUid?: string|null,
    *   planOptions?: Record<string, unknown>|null,
+   *   cartLineEnteredOption?: { uid: string, value: string }|null,
+   *   cartLineOptionUid?: string|null,
    * }} [options]
    * @returns {ValuesModel & { parentSku?: string, enteredOptions?: EnteredOption[] }}
    */
@@ -121,25 +97,25 @@ export const CartPayloadAdapter = {
     );
     const parentSku = options.parentSku || valuesParentSku;
     const base = { ...configurationValues };
-
-    let cleanEnteredOptions = withoutLegacyFakeMarkers(
-      configurationValues.enteredOptions,
+    let enteredOptions = withoutHiddenCartLineEnteredOptions(
+      asEnteredOptionsList(configurationValues.enteredOptions),
     );
 
     if (parentSku && parentSku !== sku) {
       base.parentSku = parentSku;
     }
 
-    // Save UI selection state
     if (!selection || selection.purchaseType === 'one_time') {
       saveSelectionForSku(sku, { purchaseType: 'one_time' });
       if (parentSku && parentSku !== sku) {
         saveSelectionForSku(parentSku, { purchaseType: 'one_time' });
       }
-      // One-time: omit RecurBuy merge entered_option so Magento compareOptions
-      // differs from a subscription line that carries the catalog field value.
-      if (cleanEnteredOptions.length) {
-        base.enteredOptions = cleanEnteredOptions;
+      enteredOptions = withoutCartLineEnteredOption(
+        enteredOptions,
+        options.cartLineOptionUid || options.cartLineEnteredOption?.uid,
+      );
+      if (enteredOptions.length) {
+        base.enteredOptions = enteredOptions;
       } else {
         delete base.enteredOptions;
       }
@@ -168,23 +144,13 @@ export const CartPayloadAdapter = {
 
     saveSelectionForSku(sku, enrichedSelection);
 
-    const optionId = selection.subscriptionOptionId || selection.optionId || selection.planId;
-    const fromPlanOptions = titleFromPlanOptions(options.planOptions, optionId);
-    const displayLabel = String(
-      plan?.label
-      || enrichedSelection.planSnapshot?.planLabel
-      || fromPlanOptions
-      || '',
-    ).trim();
-    cleanEnteredOptions = withAccsCartMergeOption(
-      cleanEnteredOptions,
-      options.accsCartMergeOptionUid,
-      optionId,
-      displayLabel,
+    enteredOptions = withCartLineEnteredOption(
+      enteredOptions,
+      options.cartLineEnteredOption,
     );
 
-    if (cleanEnteredOptions.length) {
-      base.enteredOptions = cleanEnteredOptions;
+    if (enteredOptions.length) {
+      base.enteredOptions = enteredOptions;
     } else {
       delete base.enteredOptions;
     }

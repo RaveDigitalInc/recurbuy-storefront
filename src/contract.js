@@ -153,3 +153,16 @@ export const RECURBUY_ENDS_LABEL = 'recurbuy_ends_label';
  * after navigation when Magento looks like catalog.
  */
 export const RECURBUY_PLAN_UNIT = 'recurbuy_plan_unit';
+
+/**
+ * Every quote-line attribute code RecurBuy owns. Any other `custom_attributes`
+ * entry on a cart line belongs to the host or another module and is never read.
+ */
+export const RECURBUY_QUOTE_ATTRIBUTE_CODES = Object.freeze([
+  RECURBUY_SUBSCRIPTION_OPTION_ID,
+  RECURBUY_SUBSCRIPTION_START_DATE,
+  RECURBUY_PLAN_LABEL,
+  RECURBUY_BILLING_PERIOD,
+  RECURBUY_ENDS_LABEL,
+  RECURBUY_PLAN_UNIT,
+]);

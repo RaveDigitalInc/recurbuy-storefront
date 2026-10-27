@@ -10,7 +10,8 @@ import {
   resolvePath,
   writeText,
 } from './lib.js';
-import { applySuitePatches, DEFAULT_SUITE } from './apply-patches.js';
+import { applySuitePatches } from './apply-patches.js';
+import { resolveSuite } from './suite-resolve.js';
 import { runEnsureStorefrontExtras } from './storefront-extras.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -30,12 +31,19 @@ function readConfigDefaults(cwd) {
 }
 
 /**
- * @param {{ cwd: string, dryRun?: boolean, suite?: string }} options
+ * @param {{ cwd: string, dryRun?: boolean, suite?: string, repatch?: boolean }} options
  */
 export function runInit(options) {
-  const { cwd, dryRun = false, suite = DEFAULT_SUITE } = options;
+  const {
+    cwd, dryRun = false, repatch = false,
+  } = options;
   const report = [];
   const warnings = [];
+
+  const resolved = resolveSuite({ cwd, explicitSuite: options.suite });
+  const { suite } = resolved;
+  report.push(`suite: ${suite} (${resolved.source})`);
+  if (resolved.warning) warnings.push(resolved.warning);
 
   // 1) package.json alias
   const pkg = loadPackageJson(cwd);
@@ -51,7 +59,12 @@ export function runInit(options) {
   }
 
   // 2–4) stock files via versioned unified patches (not regex)
-  const patched = applySuitePatches({ cwd, suite, dryRun });
+  const patched = applySuitePatches({
+    cwd,
+    suite,
+    dryRun,
+    mode: repatch ? 'repatch' : 'init',
+  });
   patched.report.forEach((line) => report.push(line));
   patched.warnings.forEach((line) => warnings.push(line));
 
@@ -68,11 +81,20 @@ export function runInit(options) {
   // 6) commerce-subscriptions block
   const blockDest = resolvePath(cwd, 'blocks', 'commerce-subscriptions');
   const blockSrc = path.join(TEMPLATES, 'blocks', 'commerce-subscriptions');
-  if (!fs.existsSync(blockDest)) {
-    report.push('blocks/commerce-subscriptions: create');
-    if (!dryRun) fs.cpSync(blockSrc, blockDest, { recursive: true });
-  } else {
+  const blockEntry = path.join(blockDest, 'commerce-subscriptions.js');
+  if (!fs.existsSync(path.join(blockSrc, 'commerce-subscriptions.js'))) {
+    warnings.push(`package template missing: ${blockSrc} — reinstall @dropins/storefront-recurbuy`);
+  } else if (fs.existsSync(blockEntry)) {
     report.push('blocks/commerce-subscriptions: already exists');
+  } else {
+    report.push('blocks/commerce-subscriptions: create');
+    if (!dryRun) {
+      fs.mkdirSync(path.dirname(blockDest), { recursive: true });
+      fs.cpSync(blockSrc, blockDest, { recursive: true });
+      if (!fs.existsSync(blockEntry)) {
+        warnings.push('blocks/commerce-subscriptions copy failed — check disk permissions and re-run init');
+      }
+    }
   }
 
   report.push('');
@@ -93,9 +115,11 @@ export function runInit(options) {
   report.push('Next:');
   report.push('  1. npm run install:dropins');
   report.push('  2. Enter the 2 values above in config.json');
-  report.push('  3. Publish the /customer/subscriptions page (or use account auto-mount when available)');
-  report.push('  4. npx recurbuy-eds doctor');
+  report.push('  3. npx recurbuy-eds publish-content --org=… --repo=…');
+  report.push('  4. npx recurbuy-eds doctor --org=… --repo=…');
   report.push('  5. RecurBuy panel: Connection + AccS webhooks + subscription options on products');
+  report.push('');
+  report.push('Later upgrades: bump package → npm install → npx recurbuy-eds upgrade → npm run install:dropins');
 
   return { report, warnings, failed: patched.failed };
 }

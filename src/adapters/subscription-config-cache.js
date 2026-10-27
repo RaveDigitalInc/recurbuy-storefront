@@ -1,4 +1,5 @@
 import { SUBSCRIPTION_REQUEST_TIMEOUT_MS, getValidSubscriptionConfig } from '../config.js';
+import { rememberCartLineOptionFromConfig } from '../helpers/cart-line-option.js';
 import { storefrontRequestHeaders } from './storefront-request-headers.js';
 
 /** @type {Map<string, Record<string, unknown>>} */
@@ -31,6 +32,7 @@ export async function loadCachedSubscriptionConfig(productId) {
   const promise = requestSubscriptionConfig(id)
     .then((payload) => {
       payloadCache.set(id, payload);
+      rememberCartLineOptionFromConfig(payload);
       return payload;
     })
     .finally(() => {

@@ -5,10 +5,10 @@
  */
 
 import { events } from '@dropins/tools/event-bus.js';
+import { createDeferredRoots } from './deferred-roots.js';
 import {
   attachPdpSubscription,
 } from './product-details.js';
-import { registerCartSelectionProvider } from './cart-mutation-hooks.js';
 
 const DEFAULTS = {
   blockSelector: '.product-details',
@@ -34,7 +34,7 @@ function normalizeSku(value) {
 }
 
 /**
- * Prefer configurable parent id for AccS pending-add / eligibility.
+ * Prefer configurable parent id for subscription-config / eligibility.
  * @param {Record<string, any>|null|undefined} product
  */
 function catalogProductData(product) {
@@ -70,6 +70,7 @@ function wrapNativeButton(native) {
  * @param {HTMLElement} block
  * @param {ReturnType<typeof attachPdpSubscription>} controller
  * @param {string} atcSelector
+ * @returns {() => void} stop waiting for the native button
  */
 function bindAtcButton(block, controller, atcSelector) {
   const bind = () => {
@@ -78,45 +79,54 @@ function bindAtcButton(block, controller, atcSelector) {
     controller.bindCartButton(wrapNativeButton(native));
     return true;
   };
-  if (bind()) return;
+  if (bind()) return () => {};
   const observer = new MutationObserver(() => {
     if (bind()) observer.disconnect();
   });
   observer.observe(block, { childList: true, subtree: true });
+  return () => observer.disconnect();
 }
 
 /**
  * @param {HTMLElement} block
  * @param {typeof DEFAULTS} selectors
- * @returns {boolean} mounted
+ * @param {(provider: import('./cart-mutation-hooks.js').CartSelectionProvider) => () => void
+ * } registerSelectionProvider
+ * @returns {(() => void)|null} unmount, or null when the block is not ready yet
  */
-function mountInBlock(block, selectors) {
+function mountInBlock(block, selectors, registerSelectionProvider) {
   const price = block.querySelector(selectors.priceSelector);
-  if (!(price instanceof HTMLElement)) return false;
+  if (!(price instanceof HTMLElement)) return null;
 
+  // Roots enter the document only while RecurBuy has something to show.
   const priceRoot = createRoot('product-details__subscription-price');
   const selectorRoot = createRoot('product-details__subscription');
-  price.after(priceRoot, selectorRoot);
-
   const detailsRoot = createRoot('product-details__subscription-details');
-  const detailsAnchor = block.querySelector(selectors.detailsAfterSelector);
-  if (detailsAnchor) {
-    detailsAnchor.after(detailsRoot);
-  } else {
-    selectorRoot.after(detailsRoot);
-  }
+  const roots = createDeferredRoots({
+    roots: [priceRoot, selectorRoot, detailsRoot],
+    attach: () => {
+      price.after(priceRoot, selectorRoot);
+      const detailsAnchor = block.querySelector(selectors.detailsAfterSelector);
+      if (detailsAnchor) {
+        detailsAnchor.after(detailsRoot);
+      } else {
+        selectorRoot.after(detailsRoot);
+      }
+    },
+  });
 
   const controller = attachPdpSubscription({
     selectorRoot,
     priceRoot,
     productPriceRoot: price,
     detailsRoot,
+    onChange: (_selection, meta) => roots.setVisible(meta.visible),
   });
 
-  events.on('pdp/valid', controller.onProductValid, { eager: true });
-  bindAtcButton(block, controller, selectors.atcSelector);
+  const validListener = events.on('pdp/valid', controller.onProductValid, { eager: true });
+  const stopBinding = bindAtcButton(block, controller, selectors.atcSelector);
 
-  registerCartSelectionProvider({
+  const unregister = registerSelectionProvider({
     matches(skus) {
       const product = events.lastPayload('pdp/data');
       const own = normalizeSku(product?.sku);
@@ -127,24 +137,47 @@ function mountInBlock(block, selectors) {
     getProductData: () => catalogProductData(events.lastPayload('pdp/data')),
   });
 
-  return true;
+  return () => {
+    unregister();
+    stopBinding();
+    validListener.off();
+    controller.destroy?.();
+    roots.dispose();
+  };
 }
 
 /**
  * No-op on pages without a Product Details block.
  *
- * @param {Partial<typeof DEFAULTS>} [options]
+ * @param {Partial<typeof DEFAULTS> & {
+ *   registerSelectionProvider: (
+ *     provider: import('./cart-mutation-hooks.js').CartSelectionProvider,
+ *   ) => () => void,
+ * }} options
+ * @returns {() => void} unmount
  */
-export function autoMountProductDetails(options = {}) {
-  if (typeof document === 'undefined') return;
-  const selectors = { ...DEFAULTS, ...options };
+export function autoMountProductDetails({ registerSelectionProvider, ...overrides }) {
+  if (typeof registerSelectionProvider !== 'function') {
+    throw new Error('autoMountProductDetails requires registerSelectionProvider');
+  }
+  if (typeof document === 'undefined') return () => {};
+  const selectors = { ...DEFAULTS, ...overrides };
   const block = document.querySelector(selectors.blockSelector);
-  if (!(block instanceof HTMLElement)) return;
+  if (!(block instanceof HTMLElement)) return () => {};
 
-  if (mountInBlock(block, selectors)) return;
+  let unmount = mountInBlock(block, selectors, registerSelectionProvider);
+  if (unmount) return () => unmount();
 
   const observer = new MutationObserver(() => {
-    if (mountInBlock(block, selectors)) observer.disconnect();
+    const mounted = mountInBlock(block, selectors, registerSelectionProvider);
+    if (!mounted) return;
+    unmount = mounted;
+    observer.disconnect();
   });
   observer.observe(block, { childList: true, subtree: true });
+
+  return () => {
+    observer.disconnect();
+    unmount?.();
+  };
 }

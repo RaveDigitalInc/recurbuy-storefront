@@ -38,6 +38,9 @@
   "scripts": {
     "recurbuy-eds": "node ./bin/recurbuy-eds.js",
     "lint": "eslint --ext .js .",
+    "test": "node --test \"test/*.test.js\"",
+    "test:cli": "node ./scripts/check-sidebar-fragment.mjs && node ./scripts/check-patches.mjs && node ./scripts/check-cart-line-option.mjs",
+    "verify:patch-upgrade": "node ./scripts/verify-patch-upgrade.mjs",
     "verify:install": "node ./scripts/verify-install.mjs"
   },
   "peerDependencies": {

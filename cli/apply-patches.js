@@ -1,16 +1,24 @@
 /**
  * Apply versioned unified diffs to stock Adobe storefront files.
- * Prefer explicit patches over regex rewrites of head.html / build.mjs / cart.js.
+ *
+ * Each patch has a stable `id` + monotonic `version` (in the suite manifest).
+ * Merchant state (`.recurbuy-eds.json`) records which id@version were applied so
+ * `upgrade` can apply only newer patch revisions without re-smearing stock files.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  readInstallState,
+  writeInstallState,
+} from './install-state.js';
 import { readText, resolvePath, writeText } from './lib.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const PATCHES_ROOT = path.join(__dirname, '..', 'patches');
-export const DEFAULT_SUITE = 'b2c-september-2026';
+/** Named after Adobe boilerplate package.json version (see patches/11.0.0/). */
+export const DEFAULT_SUITE = '11.0.0';
 
 /**
  * @param {string} [suite]
@@ -35,6 +43,49 @@ export function loadManifest(suite) {
   }
   const data = JSON.parse(readText(manifestPath));
   return { dir, ...data };
+}
+
+/**
+ * @param {Record<string, unknown>} entry
+ * @param {number} index
+ */
+export function normalizePatchEntry(entry, index) {
+  const id = String(entry.id || entry.patch || `patch-${index}`).replace(/\.patch$/i, '');
+  const version = Number(entry.version) > 0 ? Number(entry.version) : 1;
+  return {
+    id,
+    version,
+    file: String(entry.file),
+    patch: String(entry.patch),
+  };
+}
+
+/**
+ * Lines the unified diff would insert (`+…`, not `+++` headers).
+ * Used to see if the patch effect is already present in the target file —
+ * no separate `detect` markers in the manifest.
+ * @param {string} patchText
+ * @returns {string[]}
+ */
+export function plusLinesFromPatch(patchText) {
+  const out = [];
+  for (const line of patchText.replace(/\r\n/g, '\n').split('\n')) {
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      out.push(line.slice(1));
+    }
+  }
+  return out;
+}
+
+/**
+ * True when every inserted line from the patch already appears in `source`.
+ * @param {string} source
+ * @param {string} patchText
+ */
+export function patchEffectPresent(source, patchText) {
+  const plus = plusLinesFromPatch(patchText);
+  if (!plus.length) return false;
+  return plus.every((line) => source.includes(line));
 }
 
 /**
@@ -83,8 +134,6 @@ function parseHunks(patchText) {
     const hunkLines = [];
     let oldSeen = 0;
     let newSeen = 0;
-    // Stop at hunk line counts — a trailing '' from split('\\n') must not become
-    // an extra blank context line after the last real hunk line.
     while (i < rawLines.length && (oldSeen < oldCount || newSeen < newCount)) {
       const line = rawLines[i];
       if (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('@@')) {
@@ -94,7 +143,6 @@ function parseHunks(patchText) {
         i += 1;
         continue;
       }
-      // Blank line in the patch file = context blank (leading space omitted).
       const normalized = line === '' ? ' ' : line;
       const tag = normalized[0];
       if (tag === ' ') {
@@ -136,7 +184,6 @@ function applyHunk(lines, hunk, offset) {
     }
   }
 
-  // unified diff oldStart is 1-based; search near that point first, then full file
   const prefer = Math.max(0, hunk.oldStart - 1 + offset);
   const at = findSequence(lines, expected, prefer);
   if (at < 0) {
@@ -175,15 +222,101 @@ function findSequence(haystack, needle, prefer) {
 }
 
 /**
- * @param {{ cwd: string, suite?: string, dryRun?: boolean }} options
- * @returns {{ report: string[], warnings: string[], suite: string, failed: boolean }}
+ * Decide whether a patch needs work.
+ * "Already applied" is inferred from the `.patch` file (`+` lines present in source).
+ * @param {{
+ *   entry: ReturnType<typeof normalizePatchEntry>,
+ *   source: string,
+ *   patchText: string,
+ *   recorded: { version: number } | undefined,
+ *   mode: 'init' | 'upgrade' | 'repatch',
+ * }} args
+ * @returns {'skip-current' | 'mark-only' | 'apply'}
+ */
+export function decidePatchAction(args) {
+  const {
+    entry, source, patchText, recorded, mode,
+  } = args;
+  const looksPatched = patchEffectPresent(source, patchText);
+  const recordedVer = recorded ? Number(recorded.version) || 0 : 0;
+
+  if (mode === 'repatch') {
+    return looksPatched ? 'mark-only' : 'apply';
+  }
+
+  // Newer patch revision for this id → always try to apply (patch file is the delta).
+  if (recordedVer < entry.version && recorded) {
+    return 'apply';
+  }
+
+  if (recordedVer >= entry.version) {
+    return 'skip-current';
+  }
+
+  if (looksPatched) {
+    // First run: stock already has our lines (manual or prior install) — record only.
+    return 'mark-only';
+  }
+
+  return 'apply';
+}
+
+/**
+ * Pending patch ids where recorded version < manifest version (or missing),
+ * regardless of file content — used by doctor / upgrade summary.
+ * @param {string} suite
+ * @param {ReturnType<typeof readInstallState>} state
+ */
+export function listPendingPatches(suite, state) {
+  const manifest = loadManifest(suite);
+  if (!manifest) return [];
+  const applied = state?.appliedPatches || {};
+  const pending = [];
+  (manifest.patches || []).forEach((raw, index) => {
+    const entry = normalizePatchEntry(raw, index);
+    const rec = applied[entry.id];
+    const ver = rec ? Number(rec.version) || 0 : 0;
+    if (ver < entry.version) {
+      pending.push({
+        id: entry.id,
+        from: ver,
+        to: entry.version,
+        file: entry.file,
+      });
+    }
+  });
+  return pending;
+}
+
+/**
+ * @param {{
+ *   cwd: string,
+ *   suite?: string,
+ *   dryRun?: boolean,
+ *   mode?: 'init' | 'upgrade' | 'repatch',
+ * }} options
+ * @returns {{
+ *   report: string[],
+ *   warnings: string[],
+ *   suite: string,
+ *   failed: boolean,
+ *   appliedPatches: Record<string, { id: string, version: number, file: string, appliedAt: string }>,
+ *   changed: boolean,
+ * }}
  */
 export function applySuitePatches(options) {
-  const { cwd, dryRun = false } = options;
+  const {
+    cwd,
+    dryRun = false,
+    mode = 'init',
+  } = options;
   const suite = options.suite || DEFAULT_SUITE;
   const report = [];
   const warnings = [];
   const manifest = loadManifest(suite);
+  const prevState = readInstallState(cwd);
+  /** @type {Record<string, { id: string, version: number, file: string, appliedAt: string }>} */
+  const appliedPatches = { ...(prevState?.appliedPatches || {}) };
 
   if (!manifest) {
     const available = listSuites().join(', ') || '(none)';
@@ -192,46 +325,107 @@ export function applySuitePatches(options) {
       warnings: [`No patches for suite "${suite}". Available: ${available}`],
       suite,
       failed: true,
+      appliedPatches,
+      changed: false,
     };
   }
 
-  report.push(`suite patches: ${suite}`);
+  report.push(`suite patches: ${suite} (mode=${mode})`);
   let failed = false;
+  let changed = false;
+  const now = new Date().toISOString();
 
-  for (const entry of manifest.patches || []) {
+  (manifest.patches || []).forEach((raw, index) => {
+    const entry = normalizePatchEntry(raw, index);
     const targetPath = resolvePath(cwd, entry.file);
     if (!fs.existsSync(targetPath)) {
-      warnings.push(`${entry.file}: missing — add RecurBuy changes manually (see README)`);
+      warnings.push(`${entry.id}: ${entry.file} missing — add RecurBuy changes manually (see README)`);
       failed = true;
-      continue;
-    }
-
-    const current = readText(targetPath);
-    if (entry.alreadyAppliedNeedle && current.includes(entry.alreadyAppliedNeedle)) {
-      report.push(`${entry.file}: already patched`);
-      continue;
+      return;
     }
 
     const patchPath = path.join(manifest.dir, entry.patch);
     if (!fs.existsSync(patchPath)) {
-      warnings.push(`${entry.patch}: patch file missing in package`);
+      warnings.push(`${entry.id}: patch file missing (${entry.patch})`);
       failed = true;
-      continue;
+      return;
     }
 
-    const applied = applyUnifiedDiff(readText(patchPath), targetPath);
+    const patchText = readText(patchPath);
+    const current = readText(targetPath);
+    const recorded = appliedPatches[entry.id];
+    const action = decidePatchAction({
+      entry,
+      source: current,
+      patchText,
+      recorded,
+      mode,
+    });
+
+    if (action === 'skip-current') {
+      report.push(`${entry.id}@${entry.version}: up to date (${entry.file})`);
+      return;
+    }
+
+    if (action === 'mark-only') {
+      appliedPatches[entry.id] = {
+        id: entry.id,
+        version: entry.version,
+        file: entry.file,
+        appliedAt: recorded?.appliedAt || now,
+      };
+      report.push(`${entry.id}@${entry.version}: already in file — recorded in ${STATE_HINT}`);
+      changed = true;
+      return;
+    }
+
+    // action === 'apply'
+    const applied = applyUnifiedDiff(patchText, targetPath);
     if (!applied.ok) {
-      warnings.push(`${entry.file}: patch failed — ${applied.error}`);
-      warnings.push('  Add the RecurBuy lines manually (README) or use a matching boilerplate suite.');
+      if (patchEffectPresent(current, patchText)) {
+        appliedPatches[entry.id] = {
+          id: entry.id,
+          version: entry.version,
+          file: entry.file,
+          appliedAt: recorded?.appliedAt || now,
+        };
+        changed = true;
+        warnings.push(
+          `${entry.id}@${entry.version}: could not re-diff (${applied.error}); `
+          + 'patch +lines already in file — state updated. If this release needed new stock '
+          + 'lines, update the .patch (delta against current stock) and bump version.',
+        );
+        return;
+      }
+      warnings.push(`${entry.id}: patch failed on ${entry.file} — ${applied.error}`);
+      warnings.push('  Align stock files to the theme version, or apply lines from README.');
       failed = true;
-      continue;
+      return;
     }
 
-    report.push(`${entry.file}: applied ${entry.patch}`);
+    report.push(`${entry.id}@${entry.version}: applied → ${entry.file}`);
+    changed = true;
     if (!dryRun) writeText(targetPath, applied.source);
+    appliedPatches[entry.id] = {
+      id: entry.id,
+      version: entry.version,
+      file: entry.file,
+      appliedAt: now,
+    };
+  });
+
+  if (!failed) {
+    writeInstallState(cwd, { suite, appliedPatches }, { dryRun });
+    if (!dryRun) {
+      report.push(`state: wrote ${STATE_HINT} (suite=${suite})`);
+    } else {
+      report.push(`state: would write ${STATE_HINT} (suite=${suite})`);
+    }
   }
 
   return {
-    report, warnings, suite, failed,
+    report, warnings, suite, failed, appliedPatches, changed,
   };
 }
+
+const STATE_HINT = '.recurbuy-eds.json';
