@@ -1,4 +1,5 @@
 import { getValidSubscriptionConfig, SUBSCRIPTION_REQUEST_TIMEOUT_MS } from '../config.js';
+import { storefrontRequestHeaders } from './storefront-request-headers.js';
 
 /**
  * Plan titles for a simple product live in subscription-options-list HTML.
@@ -127,10 +128,7 @@ async function loadSubscriptionOptionList(productId) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       credentials: 'omit',
-      headers: {
-        Accept: 'application/json',
-        'X-RecurBuy-Connection-Token': config.connectionToken,
-      },
+      headers: storefrontRequestHeaders({ includeShopper: false }),
       signal: controller.signal,
     });
 

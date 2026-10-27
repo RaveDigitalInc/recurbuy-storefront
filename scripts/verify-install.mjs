@@ -5,6 +5,8 @@
  * init -> install:dropins -> doctor, a stock-file diff check and an uninstall.
  *
  * Usage: npm run verify:install -- [--ref <git ref>] [--dir <path>] [--keep]
+ * Default --ref is an Adobe boilerplate git tag that ships package.json version 11.0.0
+ * (patches live in patches/11.0.0/, named by that version — not by the git tag).
  */
 
 import { execFileSync } from 'node:child_process';
@@ -31,7 +33,8 @@ const option = (name, fallback) => {
   const index = args.indexOf(name);
   return index === -1 ? fallback : args[index + 1];
 };
-const ref = option('--ref', 'main');
+// Adobe git tag for clone; RecurBuy patches live in patches/11.0.0 (boilerplate version).
+const ref = option('--ref', 'b2c-september-2026');
 const keep = args.includes('--keep');
 const workDir = option('--dir', fs.mkdtempSync(path.join(os.tmpdir(), 'recurbuy-verify-')));
 

@@ -1,12 +1,14 @@
 /**
  * Subscription add-to-cart through Adobe FetchGraphQL hooks.
- * Stock blocks keep calling `addProductsToCart`; the hook enriches the
- * mutation (pending-add + merge option) and finalizes the line afterwards.
+ * Stock blocks keep calling `addProductsToCart`; after a successful add the
+ * hook stamps custom attributes on the new line.
+ *
+ * Add-on contract: both hooks are pure pass-throughs unless a registered
+ * RecurBuy selection (purchaseType `subscription`) is part of the request.
+ * All state lives in the instance returned by `createCartMutationHooks`.
  */
 
-import { refreshCart } from '@dropins/storefront-cart/api.js';
-import { captureCartLineAttributes } from '../cart-line-custom-attributes.js';
-import { prepareSubscriptionCartItem } from '../subscription-add-to-cart.js';
+import { normalizeGraphqlCartData } from '../cart-raw-normalizer.js';
 
 const ADD_OPERATION = 'ADD_PRODUCTS_TO_CART_MUTATION';
 
@@ -22,34 +24,13 @@ const ADD_OPERATION = 'ADD_PRODUCTS_TO_CART_MUTATION';
  * @typedef {{ sku?: string, externalId?: string, id?: string, name?: string }} CartProductData
  */
 
-/** @type {Set<CartSelectionProvider>} */
-const providers = new Set();
-
-/** @type {Map<string, Array<(args?: Record<string, unknown>) => Promise<void>>>} */
-const pendingFinalizers = new Map();
-
-/** @type {WeakSet<object>} */
-const hookedClients = new WeakSet();
-
 /**
- * @param {CartSelectionProvider} provider
- * @returns {() => void} unregister
+ * @typedef {{
+ *   finalize: (args?: Record<string, unknown>) => Promise<string|void>,
+ *   planUnit: { value: number, currency?: string }|null,
+ *   optionId: string|null,
+ * }} SubscriptionAddFinalize
  */
-export function registerCartSelectionProvider(provider) {
-  providers.add(provider);
-  return () => providers.delete(provider);
-}
-
-/**
- * @param {{ addBeforeHook: Function, addAfterHook: Function }} client
- *   The FetchGraphQL instance cart uses (`CORE_FETCH_GRAPHQL`).
- */
-export function installCartMutationHooks(client) {
-  if (!client || hookedClients.has(client)) return;
-  hookedClients.add(client);
-  client.addBeforeHook(beforeAddToCart);
-  client.addAfterHook(afterCartResponse);
-}
 
 /**
  * @param {RequestInit} requestInit
@@ -76,16 +57,6 @@ function itemSkus(item) {
   return [item?.sku, item?.parent_sku]
     .filter((value) => typeof value === 'string' && value.trim() !== '')
     .map((value) => value.trim().toLowerCase());
-}
-
-/**
- * @param {Record<string, any>} item
- * @returns {CartSelectionProvider|null}
- */
-function findProvider(item) {
-  const skus = itemSkus(item);
-  if (!skus.length) return null;
-  return [...providers].find((provider) => provider.matches(skus)) || null;
 }
 
 /**
@@ -118,86 +89,208 @@ function withExtras(item, extras) {
 }
 
 /**
- * @param {RequestInit} requestInit
- * @returns {Promise<RequestInit>}
+ * @param {{
+ *   client: { addBeforeHook: Function, addAfterHook: Function },
+ *   refreshCart: () => Promise<unknown>,
+ *   events: { on: (name: string, cb: Function, opts?: object) => { off: () => void } },
+ *   prepareCartItem: (args: object) => Promise<{
+ *     adobeExtras: Record<string, unknown>,
+ *     finalize: SubscriptionAddFinalize['finalize'],
+ *     planUnit?: SubscriptionAddFinalize['planUnit'],
+ *   }>,
+ * }} deps
+ *   `client` is the FetchGraphQL instance cart uses (`CORE_FETCH_GRAPHQL`).
  */
-async function beforeAddToCart(requestInit) {
-  const payload = readAddPayload(requestInit);
-  const items = payload?.variables?.cartItems;
-  if (!Array.isArray(items) || !providers.size) return requestInit;
+export function createCartMutationHooks({
+  client, refreshCart, events, prepareCartItem,
+}) {
+  /** @type {Set<CartSelectionProvider>} */
+  const providers = new Set();
+  /** @type {Map<string, SubscriptionAddFinalize[]>} keyed by rewritten request body */
+  const subscriptionFinalizers = new Map();
+  /** @type {{ off: () => void }|null} */
+  let pendingRefresh = null;
+  let enabled = true;
+  let installed = false;
 
-  const finalizers = [];
-  // Sequential: pending-add rows must register per line before the mutation.
-  const nextItems = await items.reduce(async (accPromise, item) => {
-    const acc = await accPromise;
-    const provider = findProvider(item);
-    const selection = provider?.getSelection();
-    if (!provider || selection?.purchaseType !== 'subscription') {
-      return [...acc, item];
-    }
-    if (!provider.isSelectionValid()) {
-      throw new Error('Please choose a subscription option.');
-    }
-    const prepared = await prepareSubscriptionCartItem({
-      values: toDropinValues(item),
-      selection,
-      productData: provider.getProductData(),
-      mode: 'add',
+  /**
+   * @param {Record<string, any>} item
+   * @returns {CartSelectionProvider|null}
+   */
+  const findProvider = (item) => {
+    const skus = itemSkus(item);
+    if (!skus.length) return null;
+    return [...providers].find((provider) => provider.matches(skus)) || null;
+  };
+
+  const clearPendingRefresh = () => {
+    const pending = pendingRefresh;
+    pendingRefresh = null;
+    pending?.off();
+  };
+
+  /**
+   * The refresh must not overlap the drop-in consuming the add response: it
+   * publishes `cart/data` right after it mapped that response, so a one-shot
+   * non-eager listener (eager would replay a stale payload at once) fires
+   * exactly when it is safe to refresh. One pending listener per instance.
+   */
+  const refreshAfterNextCartData = () => {
+    if (!enabled || pendingRefresh || typeof refreshCart !== 'function') return;
+
+    let fired = false;
+    const subscription = events.on('cart/data', () => {
+      fired = true;
+      clearPendingRefresh();
+      if (!enabled) return;
+      Promise.resolve(refreshCart()).catch((error) => {
+        console.warn('RecurBuy cart refresh failed:', error);
+      });
     });
-    finalizers.push(prepared.finalize);
-    return [...acc, withExtras(item, prepared.adobeExtras)];
-  }, Promise.resolve([]));
+    if (fired) {
+      subscription.off();
+    } else {
+      pendingRefresh = subscription;
+    }
+  };
 
-  if (!finalizers.length) return requestInit;
+  /**
+   * @param {RequestInit} requestInit
+   * @returns {Promise<RequestInit>}
+   */
+  const beforeAddToCart = async (requestInit) => {
+    if (!enabled || !providers.size) return requestInit;
+    const payload = readAddPayload(requestInit);
+    const items = payload?.variables?.cartItems;
+    if (!Array.isArray(items)) return requestInit;
 
-  const body = JSON.stringify({
-    ...payload,
-    variables: { ...payload.variables, cartItems: nextItems },
-  });
-  pendingFinalizers.set(body, finalizers);
-  return { ...requestInit, body };
-}
+    /** @type {SubscriptionAddFinalize[]} */
+    const finalizers = [];
+    const nextItems = await items.reduce(async (accPromise, item) => {
+      const acc = await accPromise;
+      const provider = findProvider(item);
+      const selection = provider?.getSelection();
+      if (!provider || selection?.purchaseType !== 'subscription') {
+        return [...acc, item];
+      }
+      if (!provider.isSelectionValid()) {
+        throw new Error('Please choose a subscription option.');
+      }
+      const prepared = await prepareCartItem({
+        values: toDropinValues(item),
+        selection,
+        productData: provider.getProductData(),
+        mode: 'add',
+      });
+      const optionId = selection?.subscriptionOptionId || selection?.planId || null;
+      finalizers.push({
+        finalize: prepared.finalize,
+        planUnit: prepared.planUnit || null,
+        optionId: optionId != null ? String(optionId) : null,
+      });
+      return [...acc, withExtras(item, prepared.adobeExtras)];
+    }, Promise.resolve([]));
 
-/**
- * Every cart response: remember the line markers, then finalize pending adds.
- *
- * @param {RequestInit} requestInit
- * @param {{ data?: any, errors?: unknown[] }} response
- */
-async function afterCartResponse(requestInit, response) {
-  captureCartLineAttributes(response?.data);
-  return afterAddToCart(requestInit, response);
-}
+    if (!finalizers.length) return requestInit;
 
-/**
- * Runs before the cart drop-in consumes the response, so stock blocks that
- * redirect right after `await addProductsToCart` still get a finalized line.
- *
- * @param {RequestInit} requestInit
- * @param {{ data?: any, errors?: unknown[] }} response
- */
-async function afterAddToCart(requestInit, response) {
-  const finalizers = typeof requestInit?.body === 'string'
-    ? pendingFinalizers.get(requestInit.body)
-    : null;
-  if (!finalizers) return response;
-  pendingFinalizers.delete(requestInit.body);
+    const body = JSON.stringify({
+      ...payload,
+      variables: { ...payload.variables, cartItems: nextItems },
+    });
+    subscriptionFinalizers.set(body, finalizers);
+    return { ...requestInit, body };
+  };
 
-  const result = response?.data?.addProductsToCart;
-  const failed = (response?.errors?.length ?? 0) > 0
-    || (result?.user_errors?.length ?? 0) > 0
-    || !result?.cart;
-  if (failed) return response;
+  /**
+   * Runs before the cart drop-in consumes the response, so stock blocks that
+   * redirect right after `await addProductsToCart` still get a finalized line.
+   *
+   * @param {RequestInit} requestInit
+   * @param {{ data?: any, errors?: unknown[] }} response
+   */
+  const afterAddToCart = async (requestInit, response) => {
+    const finalizers = typeof requestInit?.body === 'string'
+      ? subscriptionFinalizers.get(requestInit.body)
+      : null;
+    if (!finalizers) return response;
+    subscriptionFinalizers.delete(requestInit.body);
 
-  await finalizers.reduce(
-    (previous, finalize) => previous.then(() => finalize({ refresh: false })),
-    Promise.resolve(),
-  );
+    const result = response?.data?.addProductsToCart;
+    const failed = (response?.errors?.length ?? 0) > 0
+      || (result?.user_errors?.length ?? 0) > 0
+      || !result?.cart;
+    if (failed) return response;
 
-  // The drop-in emits cart/data from this (pre-attributes) response; repaint after it.
-  setTimeout(() => {
-    refreshCart?.();
-  }, 0);
+    // AccS addProductsToCart still returns catalog units in the same mutation
+    // response. Stamp attrs, paint PDP plan unit onto GraphQL prices for first
+    // MiniCart frame (still GraphQL itemsV2 shape), then refresh for Magento SoR.
+    /** @type {Array<{
+     *   uid?: string|null,
+     *   planUnit?: { value: number, currency?: string }|null,
+     *   optionId?: string|null,
+     * }>} */
+    const painted = [];
+    await finalizers.reduce(
+      (previous, entry) => previous.then(async () => {
+        const uid = await entry.finalize({
+          refresh: false,
+          cartResult: result.cart,
+        });
+        painted.push({
+          uid: typeof uid === 'string' ? uid : null,
+          planUnit: entry.planUnit,
+          optionId: entry.optionId,
+        });
+      }),
+      Promise.resolve(),
+    );
 
-  return response;
+    normalizeGraphqlCartData(response?.data, { optimisticLines: painted });
+    refreshAfterNextCartData();
+
+    return response;
+  };
+
+  /**
+   * Every cart response: normalise raw GraphQL cart, then finalize subscription lines.
+   *
+   * @param {RequestInit} requestInit
+   * @param {{ data?: any, errors?: unknown[] }} response
+   */
+  const afterCartResponse = async (requestInit, response) => {
+    if (!enabled) return response;
+    normalizeGraphqlCartData(response?.data);
+    return afterAddToCart(requestInit, response);
+  };
+
+  return {
+    /**
+     * @param {CartSelectionProvider} provider
+     * @returns {() => void} unregister
+     */
+    registerSelectionProvider(provider) {
+      if (!enabled) return () => {};
+      providers.add(provider);
+      return () => providers.delete(provider);
+    },
+
+    /** Attach the hooks to the client. Idempotent. */
+    install() {
+      if (!client || installed || !enabled) return;
+      installed = true;
+      client.addBeforeHook(beforeAddToCart);
+      client.addAfterHook(afterCartResponse);
+    },
+
+    /**
+     * FetchGraphQL hooks cannot be removed, so they stay attached and turn
+     * into pass-throughs.
+     */
+    dispose() {
+      enabled = false;
+      providers.clear();
+      subscriptionFinalizers.clear();
+      clearPendingRefresh();
+    },
+  };
 }

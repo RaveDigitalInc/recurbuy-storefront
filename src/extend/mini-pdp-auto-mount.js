@@ -13,20 +13,15 @@ import {
   getProductConfigurationValues,
   isProductConfigurationValid,
 } from '@dropins/storefront-pdp/api.js';
+import { showError } from '../helpers/user-prompt.js';
+import { getSubscriptionOptionIdFromCartItem } from '../cart-line-custom-attributes.js';
+import { createDeferredRoots } from './deferred-roots.js';
 import {
   attachPdpSubscription,
   resolveCartItemInitialSelection,
 } from './product-details.js';
-import { getSubscriptionOptionIdFromCartItem } from '../cart-line-custom-attributes.js';
-import { registerCartSelectionProvider } from './cart-mutation-hooks.js';
 
 const SCOPE = 'modal';
-
-/** @type {string|null} */
-let pendingEditUid = null;
-
-/** @type {WeakSet<Element>} */
-const mounted = new WeakSet();
 
 /**
  * @param {unknown} value
@@ -53,11 +48,19 @@ function catalogProductData(product) {
 }
 
 /**
- * Remember which cart line the merchant opened for edit.
+ * @typedef {{
+ *   pendingEditUid: string|null,
+ * }} EditState
  */
-function installEditUidCapture() {
-  if (typeof document === 'undefined') return;
-  document.addEventListener('click', (event) => {
+
+/**
+ * Remember which cart line the merchant opened for edit.
+ *
+ * @param {EditState} state
+ * @returns {() => void} remove the listener
+ */
+function installEditUidCapture(state) {
+  const onClick = (event) => {
     const { target } = event;
     if (!(target instanceof Element)) return;
     const button = target.closest('button');
@@ -67,8 +70,10 @@ function installEditUidCapture() {
     const row = button.closest('.dropin-cart-item');
     const testId = row?.getAttribute('data-testid') || '';
     const [, uid] = /^cart-list-item-entry-(.+)$/.exec(testId) || [];
-    if (uid) pendingEditUid = uid;
-  }, true);
+    if (uid) state.pendingEditUid = uid;
+  };
+  document.addEventListener('click', onClick, true);
+  return () => document.removeEventListener('click', onClick, true);
 }
 
 /**
@@ -106,23 +111,29 @@ function wrapNativeButton(native) {
 
 /**
  * @param {HTMLElement} root
+ * @param {{
+ *   registerSelectionProvider: Function,
+ *   state: EditState,
+ * }} context
+ * @returns {(() => void)|null} unmount, or null when the mini-PDP is not ready
  */
-function mountMiniPdp(root) {
-  if (mounted.has(root)) return;
+function mountMiniPdp(root, { registerSelectionProvider, state }) {
   const price = root.querySelector('.mini-pdp__price');
-  if (!(price instanceof HTMLElement)) return;
+  if (!(price instanceof HTMLElement)) return null;
 
-  mounted.add(root);
-
+  // Roots enter the document only while RecurBuy has something to show.
   const priceRoot = document.createElement('div');
   priceRoot.className = 'mini-pdp__subscription-price';
   const selectorRoot = document.createElement('div');
   selectorRoot.className = 'mini-pdp__subscription';
-  price.after(priceRoot, selectorRoot);
+  const roots = createDeferredRoots({
+    roots: [priceRoot, selectorRoot],
+    attach: () => price.after(priceRoot, selectorRoot),
+  });
 
   const product = events.lastPayload('pdp/data', { scope: SCOPE })
     || events.lastPayload('pdp/data');
-  const cartItem = resolveCartItem(pendingEditUid, product?.sku || '');
+  const cartItem = resolveCartItem(state.pendingEditUid, product?.sku || '');
 
   const controller = attachPdpSubscription({
     selectorRoot,
@@ -130,11 +141,16 @@ function mountMiniPdp(root) {
     productPriceRoot: price,
     scope: SCOPE,
     initialSelection: resolveCartItemInitialSelection(cartItem),
+    onChange: (_selection, meta) => roots.setVisible(meta.visible),
   });
 
-  events.on('pdp/valid', controller.onProductValid, { eager: true, scope: SCOPE });
+  const validListener = events.on(
+    'pdp/valid',
+    controller.onProductValid,
+    { eager: true, scope: SCOPE },
+  );
 
-  const unregister = registerCartSelectionProvider({
+  const unregister = registerSelectionProvider({
     matches(skus) {
       const data = events.lastPayload('pdp/data', { scope: SCOPE })
         || events.lastPayload('pdp/data');
@@ -156,21 +172,23 @@ function mountMiniPdp(root) {
     controller.bindCartButton(wrapNativeButton(native));
     return true;
   };
+  /** @type {MutationObserver|null} */
+  let buttonObserver = null;
   if (!bindButton()) {
-    const buttonObserver = new MutationObserver(() => {
+    buttonObserver = new MutationObserver(() => {
       if (bindButton()) buttonObserver.disconnect();
     });
     buttonObserver.observe(updateHost || root, { childList: true, subtree: true });
   }
 
-  root.addEventListener('click', async (event) => {
+  const onUpdateClick = async (event) => {
     const { target } = event;
     if (!(target instanceof Element)) return;
     if (!target.closest('.mini-pdp__update-button')) return;
 
     // A subscription line switched to one-time must be replaced too, otherwise
     // the stock update keeps the subscription attribute on the line.
-    const editedItem = resolveCartItem(pendingEditUid || cartItem?.uid, '');
+    const editedItem = resolveCartItem(state.pendingEditUid || cartItem?.uid, '');
     const leavesSubscription = Boolean(getSubscriptionOptionIdFromCartItem(editedItem));
     const isSubscription = controller.getSelection().purchaseType === 'subscription';
     if (!isSubscription && !leavesSubscription) return;
@@ -189,7 +207,7 @@ function mountMiniPdp(root) {
         events.lastPayload('pdp/data', { scope: SCOPE })
         || events.lastPayload('pdp/data'),
       );
-      const item = resolveCartItem(pendingEditUid || cartItem?.uid, data?.sku || '');
+      const item = resolveCartItem(state.pendingEditUid || cartItem?.uid, data?.sku || '');
       if (!item?.uid) throw new Error('Cart item not found');
 
       const quantity = values.quantity || item.quantity || 1;
@@ -218,37 +236,73 @@ function mountMiniPdp(root) {
       root.closest('dialog')?.close();
     } catch (error) {
       console.error('RecurBuy mini-PDP update failed:', error);
-      window.alert(error?.message || 'Could not update cart item');
+      showError(root, error?.message || 'Could not update cart item');
     }
-  }, true);
+  };
+  root.addEventListener('click', onUpdateClick, true);
 
+  let cleaned = false;
+  let disconnectObserver = null;
   const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    disconnectObserver?.disconnect();
+    buttonObserver?.disconnect();
+    root.removeEventListener('click', onUpdateClick, true);
+    validListener.off();
     unregister();
     controller.destroy?.();
+    roots.dispose();
   };
-  const disconnectObserver = new MutationObserver(() => {
-    if (!document.body.contains(root)) {
-      cleanup();
-      disconnectObserver.disconnect();
-    }
+  disconnectObserver = new MutationObserver(() => {
+    if (!document.body.contains(root)) cleanup();
   });
   disconnectObserver.observe(document.body, { childList: true, subtree: true });
+
+  return cleanup;
 }
 
 /**
  * No-op until a mini-PDP appears in the DOM.
+ *
+ * @param {{
+ *   registerSelectionProvider: (
+ *     provider: import('./cart-mutation-hooks.js').CartSelectionProvider,
+ *   ) => () => void,
+ * }} options
+ * @returns {() => void} unmount everything this call mounted
  */
-export function autoMountMiniPdp() {
-  if (typeof document === 'undefined') return;
-  installEditUidCapture();
+export function autoMountMiniPdp({ registerSelectionProvider }) {
+  if (typeof registerSelectionProvider !== 'function') {
+    throw new Error('autoMountMiniPdp requires registerSelectionProvider');
+  }
+  if (typeof document === 'undefined') return () => {};
+
+  /** @type {EditState} */
+  const state = { pendingEditUid: null };
+  const removeEditCapture = installEditUidCapture(state);
+  /** @type {Map<Element, () => void>} */
+  const mounted = new Map();
 
   const scan = () => {
     document.querySelectorAll('.commerce-mini-pdp').forEach((node) => {
-      if (node instanceof HTMLElement) mountMiniPdp(node);
+      if (!(node instanceof HTMLElement) || mounted.has(node)) return;
+      const unmount = mountMiniPdp(node, { registerSelectionProvider, state });
+      if (!unmount) return;
+      mounted.set(node, () => {
+        mounted.delete(node);
+        unmount();
+      });
     });
   };
 
   scan();
   const observer = new MutationObserver(scan);
   observer.observe(document.body, { childList: true, subtree: true });
+
+  return () => {
+    observer.disconnect();
+    removeEditCapture();
+    [...mounted.values()].forEach((unmount) => unmount());
+  };
 }

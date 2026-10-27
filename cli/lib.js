@@ -113,8 +113,8 @@ const BUILD_MJS_IMPORT = `import { ${BUILD_MJS_OPERATION} } from '${DEFAULT_DEP_
 
 /**
  * Fill the stock `@dropins/storefront-cart` entry (`operations: []`) of `build.mjs`
- * with the RecurBuy cart-line `custom_attributes` fragment. Comments and the
- * other entries stay untouched.
+ * with the RecurBuy CART_ITEM fragment override (`custom_attributes` +
+ * `product.uid`). Comments and the other entries stay untouched.
  * @param {string} buildMjs
  */
 export function ensureBuildMjsCartFragment(buildMjs) {

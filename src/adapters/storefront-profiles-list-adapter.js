@@ -1,4 +1,5 @@
 import { getValidSubscriptionConfig, SUBSCRIPTION_REQUEST_TIMEOUT_MS } from '../config.js';
+import { storefrontRequestHeaders } from './storefront-request-headers.js';
 
 /**
  * @typedef {object} StorefrontProfileListProduct
@@ -47,19 +48,7 @@ import { getValidSubscriptionConfig, SUBSCRIPTION_REQUEST_TIMEOUT_MS } from '../
  * @returns {Record<string, string>}
  */
 function shopperHeaders(authToken) {
-  const config = getValidSubscriptionConfig();
-  /** @type {Record<string, string>} */
-  const headers = {
-    Accept: 'application/json',
-    'X-RecurBuy-Connection-Token': config.connectionToken,
-  };
-  if (authToken) {
-    // Magento shopper identity (L-113): never put customer_id in query/body.
-    headers.Authorization = `Bearer ${authToken}`;
-    // Same JWT, explicit RecurBuy header (visible in DevTools; lab parity).
-    headers['X-RecurBuy-Customer-Token'] = authToken;
-  }
-  return headers;
+  return storefrontRequestHeaders({ authToken });
 }
 
 /**

@@ -1,4 +1,5 @@
 import { parseSubscriptionPeriod } from '../format.js';
+import { resolvePlanLabel } from './storefront-pdp-plan-labels.js';
 
 /**
  * @param {any} priceVal
@@ -56,118 +57,7 @@ function resolveCurrency(currencyFormat, rawCurrency, fallback = 'USD') {
 }
 
 /**
- * Magento planOptions are flat when override-children=Yes (`{ optionId: { title } }`),
- * and nested by product id when override=No (`{ childId: { optionId: { title } } }`).
- * Parity with configurable provider `getPlanOptions(selected_product_id)`.
- *
- * @param {Record<string, unknown>|undefined} planOptions
- * @param {string} optionKey
- * @param {string|undefined} [selectedChildId]
- * @param {string|undefined} [parentProductId]
- * @returns {string|undefined}
- */
-function resolvePlanTitle(planOptions, optionKey, selectedChildId, parentProductId) {
-  if (!planOptions || typeof planOptions !== 'object') return undefined;
-
-  const flatTitle = readTitle(planOptions[optionKey]);
-  if (flatTitle) return flatTitle;
-
-  const preferredIds = [selectedChildId, parentProductId].filter(Boolean);
-  const preferredTitle = preferredIds
-    .map((productId) => {
-      const bucket = planOptions[productId];
-      if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return undefined;
-      return readTitle(/** @type {Record<string, unknown>} */ (bucket)[optionKey]);
-    })
-    .find(Boolean);
-  if (preferredTitle) return preferredTitle;
-
-  return Object.values(planOptions)
-    .map((bucket) => {
-      if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return undefined;
-      if ('title' in bucket || 'plan_id' in bucket) return undefined;
-      return readTitle(/** @type {Record<string, unknown>} */ (bucket)[optionKey]);
-    })
-    .find(Boolean);
-}
-
-/**
- * @param {unknown} entry
- * @returns {string|undefined}
- */
-function readTitle(entry) {
-  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return undefined;
-  const { title } = /** @type {{ title?: unknown }} */ (entry);
-  return typeof title === 'string' && title.trim() ? title.trim() : undefined;
-}
-
-/**
- * True for Magento's missing-title fallback ("Plan 1"), not a merchant plan name.
- * @param {string|undefined|null} label
- * @returns {boolean}
- */
-function isPlaceholderPlanLabel(label) {
-  return !label || /^Plan \d+$/i.test(String(label).trim());
-}
-
-/**
- * Same period + cycle count that Magento prints in subscription details
- * ("Regular Payments / Monthly" + "12 x $22.50" → "Monthly 12").
- *
- * @param {Record<string, unknown>|undefined} details
- * @returns {string|undefined}
- */
-function planLabelFromPaymentDetails(details) {
-  const regular = details?.regular_payment;
-  if (!regular || typeof regular !== 'object') return undefined;
-
-  const block = /** @type {{ label?: unknown, cycles?: unknown }} */ (regular);
-  const label = typeof block.label === 'string' ? block.label : '';
-  const period = label.includes('/') ? label.split('/').pop()?.trim() : '';
-  const cycles = Number(block.cycles);
-
-  if (period && Number.isFinite(cycles) && cycles > 1) {
-    return `${period} ${cycles}`;
-  }
-  return period || undefined;
-}
-
-/**
- * @param {string} optionKey
- * @param {Record<string, unknown>} opt
- * @param {import('./storefront-options-list.js').SubscriptionOptionList|null} optionList
- * @param {Record<string, unknown>|undefined} planOptions
- * @param {Record<string, unknown>} details
- * @param {string|undefined} [selectedChildId]
- * @param {string|undefined} [parentProductId]
- * @returns {string}
- */
-function resolvePlanLabel(
-  optionKey,
-  opt,
-  optionList,
-  planOptions,
-  details,
-  selectedChildId,
-  parentProductId,
-) {
-  const candidates = [
-    optionList?.titles?.[String(optionKey)],
-    resolvePlanTitle(planOptions, optionKey, selectedChildId, parentProductId),
-    typeof details?.title === 'string' ? details.title : undefined,
-    typeof opt?.label === 'string' ? opt.label : undefined,
-    typeof opt?.name === 'string' ? opt.name : undefined,
-    planLabelFromPaymentDetails(details),
-  ];
-
-  const title = candidates.find(
-    (value) => typeof value === 'string' && !isPlaceholderPlanLabel(value),
-  );
-  return title?.trim() || `Plan ${optionKey}`;
-}
-
-/**
- * Nested regularPrices.options[optionId][childId] — Magento only exposes the option for
+ * Nested regularPrices.options[optionId][childId] — only exposes the option for
  * children that own it when override=No.
  * @param {unknown} optionNode
  * @param {string|undefined} selectedChildId
@@ -182,9 +72,9 @@ function optionExistsForSelectedChild(optionNode, selectedChildId) {
 }
 
 /**
- * Sync check from a cached subscription-config payload: does this child (or simple product)
- * expose any subscription option? Used to skip the loading chrome when Override=No and
- * the selected child has no plans.
+ * Sync check from a cached subscription-config payload: does this child (or simple
+ * product) expose any subscription option? Used to skip the loading chrome when
+ * Override=No and the selected child has no plans.
  *
  * @param {Record<string, unknown>|null|undefined} payload
  * @param {string|undefined} [selectedChildId]
@@ -203,8 +93,8 @@ export function configHasSubscriptionPlansForChild(payload, selectedChildId) {
 }
 
 /**
- * Configurable regularPrices/subscriptionDetails nest price boxes under child entity ids
- * (Magento configurable provider + selected_product_id). Prefer the selected child when set.
+ * Configurable regularPrices/subscriptionDetails nest price boxes under child
+ * entity ids. Prefer the selected child when set.
  * @param {unknown} node
  * @param {string|undefined} [selectedChildId]
  * @returns {Record<string, any>}
@@ -376,7 +266,7 @@ function asPlanId(value) {
 }
 
 /**
- * Magento product_page/subscription_options_renderer (+ configurable-* variants).
+ * Product page subscription_options_renderer (+ configurable-* variants).
  * @param {unknown} renderer
  * @returns {'radiobutton'|'dropdown'|undefined}
  */
@@ -389,7 +279,7 @@ function normalizeProductPageRenderer(renderer) {
 }
 
 /**
- * Visible Magento detail blocks: first / trial / regular payment, start and end.
+ * Visible detail blocks: first / trial / regular payment, start and end.
  * Nested override=No payloads are keyed by child entity id.
  * @param {Record<string, unknown>|undefined} details
  * @param {string|undefined} [selectedChildId]

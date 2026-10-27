@@ -1,4 +1,6 @@
 import { SUBSCRIPTION_REQUEST_TIMEOUT_MS, getValidSubscriptionConfig } from '../config.js';
+import { rememberCartLineOptionFromConfig } from '../helpers/cart-line-option.js';
+import { storefrontRequestHeaders } from './storefront-request-headers.js';
 
 /** @type {Map<string, Record<string, unknown>>} */
 const payloadCache = new Map();
@@ -30,6 +32,7 @@ export async function loadCachedSubscriptionConfig(productId) {
   const promise = requestSubscriptionConfig(id)
     .then((payload) => {
       payloadCache.set(id, payload);
+      rememberCartLineOptionFromConfig(payload);
       return payload;
     })
     .finally(() => {
@@ -83,10 +86,7 @@ async function requestSubscriptionConfig(productId) {
     const response = await fetch(url.toString(), {
       method: 'GET',
       credentials: 'omit',
-      headers: {
-        Accept: 'application/json',
-        'X-RecurBuy-Connection-Token': config.connectionToken,
-      },
+      headers: storefrontRequestHeaders({ includeShopper: false }),
       signal: controller.signal,
     });
 

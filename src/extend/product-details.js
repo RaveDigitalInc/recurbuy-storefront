@@ -24,6 +24,8 @@ import { prepareSubscriptionCartItem } from '../subscription-add-to-cart.js';
  *   scope?: string,
  *   initialSelection?: import('../contract.js').SubscriptionSelection,
  *   onChange?: (selection: unknown, meta: {
+ *     active: boolean,
+ *     visible: boolean,
  *     productValid: boolean,
  *     selectionValid: boolean,
  *   }) => void,
@@ -31,7 +33,6 @@ import { prepareSubscriptionCartItem } from '../subscription-add-to-cart.js';
  * @returns {ReturnType<typeof mountSubscriptionOnPdp>}
  */
 function mountProductDetailsSubscription(options) {
-  ensureRecurBuyStyles();
   return mountSubscriptionOnPdp(options);
 }
 
@@ -41,11 +42,13 @@ function mountProductDetailsSubscription(options) {
  * @param {ProductDetailsSubscriptionRoots & {
  *   scope?: string,
  *   initialSelection?: import('../contract.js').SubscriptionSelection,
- *   getLoading?: () => boolean,
+ *   onChange?: Function,
  * }} options
+ *   `onChange` is called after every render with `meta.visible` (RecurBuy has
+ *   something to show) — the host mounts its roots only while that is true.
  */
 export function attachPdpSubscription(options) {
-  const { getLoading, ...mountOptions } = options;
+  const { onChange, ...mountOptions } = options;
 
   /** @type {{ setProps: Function }|null} */
   let buttonRef = null;
@@ -55,12 +58,16 @@ export function attachPdpSubscription(options) {
   const validity = createCartActionValidityBridge({
     getButton: () => buttonRef,
     getSubscriptionController: () => controller,
-    getLoading: getLoading || (() => false),
   });
 
   controller = mountProductDetailsSubscription({
     ...mountOptions,
-    onChange: validity.onSubscriptionChange,
+    onChange: (selection, meta) => {
+      // Styles are fetched only once there is RecurBuy UI to style.
+      if (meta.visible) ensureRecurBuyStyles();
+      validity.onSubscriptionChange(selection, meta);
+      onChange?.(selection, meta);
+    },
   });
 
   return {
@@ -89,7 +96,6 @@ export function attachPdpSubscription(options) {
      * }} [options]
      */
     async prepareCartItem(values, prepareOptions = {}) {
-      // prepareSubscriptionCartItem owns merge uid + pending selection_skus.
       return prepareSubscriptionCartItem({
         values,
         selection: controller.getSelection(),
@@ -102,68 +108,42 @@ export function attachPdpSubscription(options) {
 }
 
 /**
- * Disable Add/Update cart button when PDP config or subscription selection is invalid.
- *
- * @param {{ setProps: Function }|null|undefined} button
- * @param {{
- *   productValid?: boolean,
- *   subscriptionController?: { isSelectionValid: () => boolean }|null,
- *   loading?: boolean,
- * }} [state]
- */
-function setCartActionDisabled(button, state = {}) {
-  if (!button) return;
-  const {
-    productValid = true,
-    subscriptionController = null,
-    loading = false,
-  } = state;
-  const selectionValid = subscriptionController
-    ? subscriptionController.isSelectionValid()
-    : true;
-  const disabled = loading || !productValid || !selectionValid;
-
-  if (typeof button.setProps === 'function') {
-    button.setProps((prev) => ({
-      ...prev,
-      disabled,
-    }));
-    return;
-  }
-
-  if (button instanceof HTMLButtonElement) {
-    button.disabled = disabled;
-  }
-}
-
-/**
- * Keeps Add/Update button disabled state in sync with PDP + subscription validity.
+ * Keeps the Add/Update button disabled while a RecurBuy subscription is chosen
+ * but incomplete. The native button state is otherwise never written: a
+ * product without an active subscription leaves the host's button alone.
  *
  * @param {{
  *   getSubscriptionController: () => { isSelectionValid: () => boolean }|null|undefined,
  *   getButton: () => { setProps: Function }|null|undefined,
- *   getLoading?: () => boolean,
  * }} options
  */
 function createCartActionValidityBridge(options) {
-  const {
-    getSubscriptionController,
-    getButton,
-    getLoading = () => false,
-  } = options;
+  const { getSubscriptionController, getButton } = options;
 
   let productValid = true;
+  let disabledByUs = false;
+
+  /** @param {boolean} disabled */
+  const writeDisabled = (disabled) => {
+    getButton()?.setProps((prev) => ({ ...prev, disabled }));
+  };
 
   const sync = () => {
-    setCartActionDisabled(getButton(), {
-      productValid,
-      subscriptionController: getSubscriptionController(),
-      loading: getLoading(),
-    });
+    if (!getButton()) return;
+    // `isSelectionValid` is false only for an active, incomplete subscription.
+    const incomplete = getSubscriptionController()?.isSelectionValid() === false;
+    if (incomplete) {
+      disabledByUs = true;
+      writeDisabled(true);
+      return;
+    }
+    if (!disabledByUs) return;
+    // Hand the button back in the state the host's own validity implies.
+    disabledByUs = false;
+    writeDisabled(!productValid);
   };
 
   return {
-    getProductValid: () => productValid,
     sync,
     /** Pass to `mountProductDetailsSubscription({ onChange })`. */
     onSubscriptionChange: (_selection, meta) => {

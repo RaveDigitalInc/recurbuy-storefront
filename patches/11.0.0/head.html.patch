@@ -1,0 +1,13 @@
+--- a/head.html
++++ b/head.html
+@@ -28,7 +28,9 @@
+             "@dropins/storefront-wishlist/": "/scripts/__dropins__/storefront-wishlist/",
+             "@dropins/storefront-personalization/": "/scripts/__dropins__/storefront-personalization/",
+             "@dropins/storefront-product-discovery/": "/scripts/__dropins__/storefront-product-discovery/",
+-            "@dropins/tools/": "/scripts/__dropins__/tools/"
++            "@dropins/tools/": "/scripts/__dropins__/tools/",
++            "@dropins/storefront-recurbuy/": "/scripts/__dropins__/storefront-recurbuy/",
++            "@dropins/storefront-recurbuy": "/scripts/__dropins__/storefront-recurbuy/api.js"
+         }
+     }
+ </script>

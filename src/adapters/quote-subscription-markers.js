@@ -8,8 +8,14 @@ import {
   RECURBUY_SUBSCRIPTION_START_DATE,
 } from '../contract.js';
 import { parseQuoteBillingPeriod, parseSubscriptionPeriod } from '../format.js';
+import { isCatalogDrift } from '../plan-price.js';
 import { isPlaceholderPlanLabel } from './storefront-cart-items-mapper.js';
 import { peekCachedSubscriptionConfig } from './subscription-config-cache.js';
+
+export {
+  peekCapturedQuoteMarkers,
+  subscriptionMarkersNeedCatalogBackfill,
+} from './quote-markers-peek.js';
 
 const QUOTE_SUBSCRIPTION_MARKERS_QUERY = `
   query QuoteSubscriptionMarkers($cartId: String!) {
@@ -30,22 +36,16 @@ const QUOTE_SUBSCRIPTION_MARKERS_QUERY = `
 `;
 
 /**
+ * @typedef {import('./quote-markers-peek.js').QuoteSubscriptionMarker} QuoteSubscriptionMarker
+ */
+
+/**
  * Cart-item custom attributes are the quote's subscription SoR for markers.
  * Unit price: Magento GraphQL {@code prices.price} when it matches the plan;
  * otherwise stamped {@code recurbuy_plan_unit} (dynamic-bundle child-sum lag).
  *
  * @param {string} cartId
- * @returns {Promise<Map<string, {
- *   optionId: string,
- *   catalogProductId: string,
- *   unitPrice: number|null,
- *   currency: string,
- *   startDate: string,
- *   planLabel: string,
- *   period: import('../contract.js').SubscriptionPeriod|null,
- *   endsLabel: string,
- *   stampedPlanUnit: { value: number, currency: string }|null,
- * }>>}
+ * @returns {Promise<Map<string, QuoteSubscriptionMarker>>}
  */
 export async function loadQuoteSubscriptionMarkers(cartId) {
   const markers = new Map();
@@ -65,26 +65,8 @@ export async function loadQuoteSubscriptionMarkers(cartId) {
   if (!Array.isArray(items)) return markers;
 
   items.forEach((item) => {
-    const uid = typeof item?.uid === 'string' ? item.uid : '';
-    const attrs = item?.custom_attributes;
-    const optionId = attributeValue(attrs, RECURBUY_SUBSCRIPTION_OPTION_ID);
-    if (!uid || !optionId || optionId === '0') return;
-
-    const unitPrice = Number(item?.prices?.price?.value);
-    const stampedPlanUnit = parsePlanUnit(attributeValue(attrs, RECURBUY_PLAN_UNIT));
-    markers.set(uid, {
-      optionId,
-      catalogProductId: catalogProductId(item),
-      unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
-      currency: typeof item?.prices?.price?.currency === 'string'
-        ? item.prices.price.currency
-        : 'USD',
-      startDate: attributeValue(attrs, RECURBUY_SUBSCRIPTION_START_DATE),
-      planLabel: attributeValue(attrs, RECURBUY_PLAN_LABEL),
-      period: parseQuoteBillingPeriod(attributeValue(attrs, RECURBUY_BILLING_PERIOD)),
-      endsLabel: attributeValue(attrs, RECURBUY_ENDS_LABEL),
-      stampedPlanUnit,
-    });
+    const marker = markerFromGraphqlItem(item);
+    if (marker) markers.set(item.uid, marker);
   });
 
   return markers;
@@ -121,10 +103,7 @@ export async function subscriptionDetailsFromQuoteMarker(marker) {
   const stamped = marker.stampedPlanUnit;
   const magentoValue = marker.unitPrice;
   const stampedValue = stamped?.value;
-  const magentoLooksLikeCatalog = typeof stampedValue === 'number'
-    && stampedValue > 0
-    && typeof magentoValue === 'number'
-    && magentoValue > stampedValue * 1.15;
+  const magentoLooksLikeCatalog = isCatalogDrift(magentoValue, stampedValue);
   let priceValue = stampedValue ?? 0;
   if (magentoLooksLikeCatalog) {
     priceValue = stampedValue;
@@ -148,6 +127,34 @@ export async function subscriptionDetailsFromQuoteMarker(marker) {
     },
     ...(startDate ? { startDate } : {}),
     ...(endsLabel ? { endsLabel } : {}),
+  };
+}
+
+/**
+ * @param {Record<string, any>} item
+ * @returns {QuoteSubscriptionMarker|null}
+ */
+function markerFromGraphqlItem(item) {
+  const uid = typeof item?.uid === 'string' ? item.uid : '';
+  const attrs = item?.custom_attributes;
+  const optionId = attributeValue(attrs, RECURBUY_SUBSCRIPTION_OPTION_ID);
+  if (!uid || !optionId || optionId === '0') return null;
+
+  const unitPrice = Number(item?.prices?.price?.value);
+  const stampedPlanUnit = parsePlanUnit(attributeValue(attrs, RECURBUY_PLAN_UNIT));
+  return {
+    optionId,
+    catalogProductId: decodeCatalogId(item?.configured_variant?.uid)
+      || decodeCatalogId(item?.product?.uid),
+    unitPrice: Number.isFinite(unitPrice) ? unitPrice : null,
+    currency: typeof item?.prices?.price?.currency === 'string'
+      ? item.prices.price.currency
+      : 'USD',
+    startDate: attributeValue(attrs, RECURBUY_SUBSCRIPTION_START_DATE),
+    planLabel: attributeValue(attrs, RECURBUY_PLAN_LABEL),
+    period: parseQuoteBillingPeriod(attributeValue(attrs, RECURBUY_BILLING_PERIOD)),
+    endsLabel: attributeValue(attrs, RECURBUY_ENDS_LABEL),
+    stampedPlanUnit,
   };
 }
 
@@ -189,17 +196,6 @@ function attributeValue(attributes, code) {
   if (!Array.isArray(attributes)) return '';
   const match = attributes.find((attribute) => attribute?.attribute_code === code);
   return typeof match?.value === 'string' ? match.value.trim() : '';
-}
-
-/**
- * Commerce product uid is the base64 catalog id (`OTg=` → `98`).
- * The configured variant is the child that owns the option.
- *
- * @param {{ product?: { uid?: string }, configured_variant?: { uid?: string } }} item
- * @returns {string}
- */
-function catalogProductId(item) {
-  return decodeCatalogId(item?.configured_variant?.uid) || decodeCatalogId(item?.product?.uid);
 }
 
 /**
