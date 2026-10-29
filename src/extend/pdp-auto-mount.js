@@ -34,6 +34,25 @@ function normalizeSku(value) {
 }
 
 /**
+ * Parent and configured-variant SKUs the PDP may expose. Configurable ATC often
+ * sends only the child SKU without parent_sku — matching parent alone then
+ * skips prepare/finalize and never fires setCustomAttributesOnCartItem.
+ *
+ * @param {Record<string, any>|null|undefined} product
+ * @returns {string[]}
+ */
+function productSkuCandidates(product) {
+  if (!product || typeof product !== 'object') return [];
+  const configured = product.configuredVariant || product.configured_variant || {};
+  return [
+    product.sku,
+    product.topLevelSku,
+    product.parentSku,
+    configured.sku,
+  ].map(normalizeSku).filter(Boolean);
+}
+
+/**
  * Prefer configurable parent id for subscription-config / eligibility.
  * @param {Record<string, any>|null|undefined} product
  */
@@ -128,9 +147,8 @@ function mountInBlock(block, selectors, registerSelectionProvider) {
 
   const unregister = registerSelectionProvider({
     matches(skus) {
-      const product = events.lastPayload('pdp/data');
-      const own = normalizeSku(product?.sku);
-      return own !== '' && skus.includes(own);
+      const own = productSkuCandidates(events.lastPayload('pdp/data'));
+      return own.some((sku) => skus.includes(sku));
     },
     getSelection: () => controller.getSelection(),
     isSelectionValid: () => controller.isSelectionValid(),

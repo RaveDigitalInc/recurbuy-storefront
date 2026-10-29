@@ -13,6 +13,13 @@ import { normalizeGraphqlCartData } from '../cart-raw-normalizer.js';
 const ADD_OPERATION = 'ADD_PRODUCTS_TO_CART_MUTATION';
 
 /**
+ * Carries pending finalize work on the FetchGraphQL requestInit object so an
+ * after-hook still finds it when another before-hook rewrites `body`.
+ * Symbol.for keeps the key stable across duplicate module evaluations.
+ */
+const RECURBUY_FINALIZERS = Symbol.for('recurbuy.cartFinalizers');
+
+/**
  * @typedef {Object} CartSelectionProvider
  * @property {(skus: string[]) => boolean} matches
  * @property {() => import('../contract.js').SubscriptionSelection} getSelection
@@ -60,6 +67,17 @@ function itemSkus(item) {
 }
 
 /**
+ * @param {unknown} left
+ * @param {unknown} right
+ * @returns {boolean}
+ */
+function sameSku(left, right) {
+  return typeof left === 'string'
+    && typeof right === 'string'
+    && left.trim().toLowerCase() === right.trim().toLowerCase();
+}
+
+/**
  * GraphQL CartItemInput → drop-in values shape used by prepare.
  * @param {Record<string, any>} item
  */
@@ -79,7 +97,14 @@ function toDropinValues(item) {
  */
 function withExtras(item, extras) {
   const next = { ...item };
-  if (typeof extras.parentSku === 'string' && extras.parentSku !== item.sku) {
+  // Configurable ATC often sends parent as `sku` + selected_options (no parent_sku).
+  // PDP product.sku may only differ by case ("Configurable-1" vs "configurable-1");
+  // injecting parent_sku for that makes AccS return Internal server error.
+  if (
+    typeof extras.parentSku === 'string'
+    && extras.parentSku.trim() !== ''
+    && !sameSku(extras.parentSku, item.sku)
+  ) {
     next.parent_sku = extras.parentSku;
   }
   if (Object.prototype.hasOwnProperty.call(extras, 'enteredOptions')) {
@@ -106,12 +131,40 @@ export function createCartMutationHooks({
 }) {
   /** @type {Set<CartSelectionProvider>} */
   const providers = new Set();
-  /** @type {Map<string, SubscriptionAddFinalize[]>} keyed by rewritten request body */
-  const subscriptionFinalizers = new Map();
+  /**
+   * FIFO fallback when a later before-hook replaces requestInit without
+   * spreading the Symbol-tagged object (body-string Map keys were brittle).
+   * @type {SubscriptionAddFinalize[][]}
+   */
+  const pendingFinalizerQueue = [];
   /** @type {{ off: () => void }|null} */
   let pendingRefresh = null;
   let enabled = true;
   let installed = false;
+
+  /**
+   * @param {RequestInit|null|undefined} requestInit
+   * @returns {SubscriptionAddFinalize[]|null}
+   */
+  const takeFinalizers = (requestInit) => {
+    const tagged = requestInit != null && typeof requestInit === 'object'
+      ? /** @type {Record<PropertyKey, unknown>} */ (requestInit)[RECURBUY_FINALIZERS]
+      : null;
+    if (Array.isArray(tagged) && tagged.length) {
+      const idx = pendingFinalizerQueue.indexOf(
+        /** @type {SubscriptionAddFinalize[]} */ (tagged),
+      );
+      // Only this instance's queue may claim the tag (isolation across carts).
+      if (idx < 0) return null;
+      pendingFinalizerQueue.splice(idx, 1);
+      delete /** @type {Record<PropertyKey, unknown>} */ (requestInit)[RECURBUY_FINALIZERS];
+      return /** @type {SubscriptionAddFinalize[]} */ (tagged);
+    }
+    if (!readAddPayload(requestInit) || pendingFinalizerQueue.length === 0) {
+      return null;
+    }
+    return pendingFinalizerQueue.shift() || null;
+  };
 
   /**
    * @param {Record<string, any>} item
@@ -197,8 +250,11 @@ export function createCartMutationHooks({
       ...payload,
       variables: { ...payload.variables, cartItems: nextItems },
     });
-    subscriptionFinalizers.set(body, finalizers);
-    return { ...requestInit, body };
+    /** @type {RequestInit & Record<PropertyKey, unknown>} */
+    const next = { ...requestInit, body };
+    next[RECURBUY_FINALIZERS] = finalizers;
+    pendingFinalizerQueue.push(finalizers);
+    return next;
   };
 
   /**
@@ -209,11 +265,8 @@ export function createCartMutationHooks({
    * @param {{ data?: any, errors?: unknown[] }} response
    */
   const afterAddToCart = async (requestInit, response) => {
-    const finalizers = typeof requestInit?.body === 'string'
-      ? subscriptionFinalizers.get(requestInit.body)
-      : null;
+    const finalizers = takeFinalizers(requestInit);
     if (!finalizers) return response;
-    subscriptionFinalizers.delete(requestInit.body);
 
     const result = response?.data?.addProductsToCart;
     const failed = (response?.errors?.length ?? 0) > 0
@@ -224,6 +277,8 @@ export function createCartMutationHooks({
     // AccS addProductsToCart still returns catalog units in the same mutation
     // response. Stamp attrs, paint PDP plan unit onto GraphQL prices for first
     // MiniCart frame (still GraphQL itemsV2 shape), then refresh for Magento SoR.
+    // Finalize errors must not reject the host add — Magento already committed
+    // the line; throwing here used to skip setCustomAttributesOnCartItem entirely.
     /** @type {Array<{
      *   uid?: string|null,
      *   planUnit?: { value: number, currency?: string }|null,
@@ -232,15 +287,19 @@ export function createCartMutationHooks({
     const painted = [];
     await finalizers.reduce(
       (previous, entry) => previous.then(async () => {
-        const uid = await entry.finalize({
-          refresh: false,
-          cartResult: result.cart,
-        });
-        painted.push({
-          uid: typeof uid === 'string' ? uid : null,
-          planUnit: entry.planUnit,
-          optionId: entry.optionId,
-        });
+        try {
+          const uid = await entry.finalize({
+            refresh: false,
+            cartResult: result.cart,
+          });
+          painted.push({
+            uid: typeof uid === 'string' ? uid : null,
+            planUnit: entry.planUnit,
+            optionId: entry.optionId,
+          });
+        } catch (error) {
+          console.warn('RecurBuy cart finalize failed:', error);
+        }
       }),
       Promise.resolve(),
     );
@@ -289,7 +348,7 @@ export function createCartMutationHooks({
     dispose() {
       enabled = false;
       providers.clear();
-      subscriptionFinalizers.clear();
+      pendingFinalizerQueue.length = 0;
       clearPendingRefresh();
     },
   };

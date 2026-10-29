@@ -727,11 +727,10 @@
     }
 }
 
-/* Magento aw_sarp2 customer subscriptions list — match account drop-in tokens */
+/* Magento aw_sarp2 customer subscriptions list — match account drop-in tokens.
+ * Scope: RecurBuy list roots only (never EDS .section / Columns). */
 .recurbuy-subscriptions-list {
   width: 100%;
-  max-width: 100%;
-  min-width: 0;
   box-sizing: border-box;
 }
 
@@ -820,16 +819,14 @@
 }
 
 .aw-sarp2-customer-subscriptions {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 100%;
 }
 
 .aw-sarp2-customer-subscriptions .data.table {
   width: max-content;
-  max-width: none;
+  min-width: 100%;
   border-collapse: collapse;
 }
 
@@ -851,7 +848,6 @@
 
 .aw-sarp2-customer-subscriptions .col.products {
   white-space: normal;
-  min-width: 8rem;
   max-width: 14rem;
 }
 

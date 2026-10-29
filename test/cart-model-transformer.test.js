@@ -127,6 +127,34 @@ describe('transformCartModel', () => {
     assert.equal(patch.items[0].recurbuy.planUnit.value, 22.5);
   });
 
+  it('prefers stamped plan unit when AccS add response still has catalog prices', () => {
+    const patch = transformCartModel({
+      itemsV2: {
+        items: [subscriptionGraphqlItem({
+          prices: {
+            price: money(46),
+            row_total: money(46),
+            original_item_price: money(46),
+            original_row_total: money(46),
+          },
+          custom_attributes: [
+            { attribute_code: RECURBUY_SUBSCRIPTION_OPTION_ID, value: '20' },
+            { attribute_code: RECURBUY_PLAN_UNIT, value: '5.6|USD' },
+          ],
+          configured_variant: {
+            price_range: {
+              maximum_price: { regular_price: money(46), final_price: money(46) },
+            },
+          },
+        })],
+      },
+    });
+
+    assert.equal(patch.items[0].regularPrice.value, 5.6);
+    assert.equal(patch.items[0].total.value, 5.6);
+    assert.equal(patch.items[0].price.value, 5.6);
+  });
+
   it('accepts CartModel-shaped items for characterization', () => {
     const patch = transformCartModel({
       items: [{

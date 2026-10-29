@@ -104,14 +104,16 @@ export function createProvider({ purchaseType = 'subscription', skus = ['sku-a']
 }
 
 /**
- * @param {{ finalize?: Function }} [options]
+ * @param {{ finalize?: Function, adobeExtras?: Record<string, unknown> }} [options]
  */
-export function createPrepareStub({ finalize } = {}) {
+export function createPrepareStub({ finalize, adobeExtras } = {}) {
   const calls = [];
   const prepareCartItem = async (args) => {
     calls.push(args);
     return {
-      adobeExtras: { enteredOptions: [{ uid: 'opt-1', value: 'Every month [#42]' }] },
+      adobeExtras: adobeExtras || {
+        enteredOptions: [{ uid: 'opt-1', value: 'Every month [#42]' }],
+      },
       finalize: finalize || (async () => 'uid-1'),
       planUnit: { value: 9.5, currency: 'USD' },
     };

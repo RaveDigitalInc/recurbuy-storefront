@@ -230,6 +230,11 @@ export async function prepareSubscriptionCartItem(input) {
     finalize: async (args = {}) => {
       const finalizeUid = args.itemUid || itemUid;
       let currentCart = args.cartResult || (await getCartData());
+      // Prefer the cart id Magento just returned — cache may still be empty on
+      // the first guest add, and stamping the wrong masked id is a silent miss.
+      const stampCartId = currentCart?.id
+        ? String(currentCart.id)
+        : cartId;
       let targetUid = mode === 'update'
         ? (finalizeUid || findLineUidBySku(currentCart, cartItem.sku, cartItem.parentSku))
         : resolveAddedLineUid(cartBefore, currentCart, cartItem);
@@ -253,7 +258,7 @@ export async function prepareSubscriptionCartItem(input) {
 
       rememberResolvedLineSelection(currentCart, targetUid, selection);
       await persistSubscriptionLine(
-        cartId,
+        stampCartId,
         targetUid,
         subscriptionOptionId,
         selection,

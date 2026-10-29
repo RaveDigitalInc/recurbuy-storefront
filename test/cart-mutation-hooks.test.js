@@ -103,6 +103,76 @@ describe('cart mutation hooks: pass-through for non-RecurBuy traffic', () => {
     assert.deepEqual(items[1], plain);
   });
 
+  it('does not inject parent_sku when PDP parent only differs by case from cart sku', async () => {
+    const client = createClientStub();
+    const events = createEventsStub();
+    const prepare = createPrepareStub({
+      adobeExtras: {
+        parentSku: 'Configurable-1',
+        enteredOptions: [{ uid: 'opt-1', value: 'TEST [#20]' }],
+      },
+    });
+    const hooks = createCartMutationHooks({
+      client,
+      events,
+      refreshCart: async () => {},
+      prepareCartItem: prepare.prepareCartItem,
+    });
+    hooks.install();
+    hooks.registerSelectionProvider({
+      matches: (skus) => skus.includes('configurable-1'),
+      getSelection: () => ({ purchaseType: 'subscription', planId: 20 }),
+      isSelectionValid: () => true,
+      getProductData: () => ({ sku: 'Configurable-1', externalId: '99', id: '99' }),
+    });
+
+    const request = addToCartRequest([{
+      sku: 'configurable-1',
+      quantity: 1,
+      selected_options: ['Y29uZmlndXJhYmxlLzkzLzMz'],
+    }]);
+    const out = await client.roundTrip(request, addToCartResponse());
+    const cartItem = JSON.parse(out.request.body).variables.cartItems[0];
+
+    assert.equal(cartItem.sku, 'configurable-1');
+    assert.equal(cartItem.parent_sku, undefined);
+    assert.deepEqual(cartItem.entered_options, [{ uid: 'opt-1', value: 'TEST [#20]' }]);
+  });
+
+  it('still sets parent_sku when the cart line sku is a distinct child', async () => {
+    const client = createClientStub();
+    const events = createEventsStub();
+    const prepare = createPrepareStub({
+      adobeExtras: {
+        parentSku: 'Configurable-1',
+        enteredOptions: [{ uid: 'opt-1', value: 'TEST [#20]' }],
+      },
+    });
+    const hooks = createCartMutationHooks({
+      client,
+      events,
+      refreshCart: async () => {},
+      prepareCartItem: prepare.prepareCartItem,
+    });
+    hooks.install();
+    hooks.registerSelectionProvider({
+      matches: (skus) => skus.includes('configurable-black-xl'),
+      getSelection: () => ({ purchaseType: 'subscription', planId: 20 }),
+      isSelectionValid: () => true,
+      getProductData: () => ({ sku: 'Configurable-1', externalId: '99', id: '99' }),
+    });
+
+    const request = addToCartRequest([{
+      sku: 'Configurable-black-XL',
+      quantity: 1,
+    }]);
+    const out = await client.roundTrip(request, addToCartResponse());
+    const cartItem = JSON.parse(out.request.body).variables.cartItems[0];
+
+    assert.equal(cartItem.parent_sku, 'Configurable-1');
+    assert.deepEqual(cartItem.entered_options, [{ uid: 'opt-1', value: 'TEST [#20]' }]);
+  });
+
   it('turns into a pass-through after dispose()', async () => {
     const {
       client, hooks, prepare, events,
@@ -247,6 +317,45 @@ describe('cart mutation hooks: subscription add and refresh', () => {
     }
   });
 
+  it('keeps the Magento add response when finalize throws (stamp must not abort ATC)', async () => {
+    const warn = mock.method(console, 'warn', () => {});
+    try {
+      const { client, hooks } = setup({
+        finalize: async () => { throw new Error('UID not found'); },
+      });
+      hooks.registerSelectionProvider(createProvider());
+      const response = addToCartResponse();
+
+      const out = await client.roundTrip(addToCartRequest([item]), response);
+
+      assert.equal(out.response, response);
+      assert.equal(warn.mock.callCount(), 1);
+      assert.match(String(warn.mock.calls[0].arguments[0]), /finalize failed/);
+    } finally {
+      warn.mock.restore();
+    }
+  });
+
+  it('still finalizes when a later before-hook rewrites body without keeping the Symbol', async () => {
+    const finalizeCalls = [];
+    const { client, hooks } = setup({
+      finalize: async () => {
+        finalizeCalls.push(1);
+        return 'uid-1';
+      },
+    });
+    hooks.registerSelectionProvider(createProvider());
+    // Simulate a host before-hook that returns a fresh requestInit (body only).
+    client.addBeforeHook(async (requestInit) => ({
+      method: requestInit.method,
+      body: requestInit.body,
+    }));
+
+    await client.roundTrip(addToCartRequest([item]), addToCartResponse());
+
+    assert.equal(finalizeCalls.length, 1);
+  });
+
   it('rejects a subscription add with an invalid selection', async () => {
     const { client, hooks } = setup();
     hooks.registerSelectionProvider(createProvider({ valid: false }));
@@ -287,7 +396,7 @@ describe('cart mutation hooks: instance isolation', () => {
     assert.equal(outB.request, request);
     assert.equal(prepareB.calls.length, 0);
 
-    // A's rewritten body is not a finalizer key of B.
+    // A's pending finalizers must not be consumed by B's after-hook.
     const outA = await a.client.roundTrip(request, addToCartResponse());
     const responseForB = addToCartResponse();
     const snapshot = structuredClone(responseForB);

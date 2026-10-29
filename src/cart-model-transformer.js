@@ -190,13 +190,29 @@ function alignPlanUnitDisplayFields(item, recurbuy) {
   const fromModelPrice = Number(item.price?.value);
   const fromGraphqlPrice = Number(item.prices?.price?.value);
   const fallbackUnit = optimistic ? Number(optimistic.value) : NaN;
+  const catalogRegular = Number(
+    item.regularPrice?.value
+    ?? item.prices?.original_item_price?.value
+    ?? item.configured_variant?.price_range?.maximum_price?.regular_price?.value
+    ?? item.configuredVariant?.price_range?.maximum_price?.regular_price?.value,
+  );
+
+  // Magento unit when it has left catalog; otherwise stamped plan unit (add
+  // response still carries catalog prices.price until the webhook lands).
+  const liveUnit = Number.isFinite(fromModelPrice) && fromModelPrice >= 0
+    ? fromModelPrice
+    : (Number.isFinite(fromGraphqlPrice) && fromGraphqlPrice >= 0 ? fromGraphqlPrice : NaN);
   let unit = NaN;
-  if (Number.isFinite(fromModelPrice) && fromModelPrice >= 0) {
-    unit = fromModelPrice;
-  } else if (Number.isFinite(fromGraphqlPrice) && fromGraphqlPrice >= 0) {
-    unit = fromGraphqlPrice;
-  } else {
+  if (
+    Number.isFinite(liveUnit)
+    && Number.isFinite(catalogRegular)
+    && Math.abs(liveUnit - catalogRegular) > 0.01
+  ) {
+    unit = liveUnit;
+  } else if (Number.isFinite(fallbackUnit) && fallbackUnit >= 0) {
     unit = fallbackUnit;
+  } else {
+    unit = liveUnit;
   }
   if (!Number.isFinite(unit) || unit < 0) return {};
 
@@ -221,12 +237,17 @@ function alignPlanUnitDisplayFields(item, recurbuy) {
       currency: item.prices.row_total.currency || currency,
     }
     : null;
-  const rowMoney = rowFromModel || rowFromGraphql || { value: unit * quantity, currency };
+  // When unit came from the plan stamp but Magento row is still catalog, prefer unit×qty.
+  const rowLooksCatalog = rowFromGraphql
+    && Number.isFinite(catalogRegular)
+    && Math.abs(rowFromGraphql.value - catalogRegular * quantity) < 0.01
+    && Number.isFinite(fallbackUnit)
+    && Math.abs(fallbackUnit - catalogRegular) > 0.01;
+  const rowMoney = rowLooksCatalog
+    ? { value: unit * quantity, currency }
+    : (rowFromModel || rowFromGraphql || { value: unit * quantity, currency });
 
-  const regular = Number(
-    item.regularPrice?.value
-    ?? item.prices?.original_item_price?.value,
-  );
+  const regular = catalogRegular;
   const total = Number(
     item.total?.value
     ?? item.prices?.original_row_total?.value,

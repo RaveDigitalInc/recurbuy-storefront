@@ -1,22 +1,17 @@
-/* Keep account Columns layout stable: wide table must not squeeze the sidebar. */
+/*
+ * RecurBuy block only — do not style body.columns / .section / sidebar.
+ *
+ * Core Columns uses flex-basis:auto (max-content). A table with width:100%
+ * resolves to the full row and the content section wraps under the sidebar.
+ * Orders cards stay narrow intrinsically, so they sit beside the sidebar and
+ * then grow. A definite 42rem width keeps our section on that same row
+ * (~30/70 after flex-grow); min-width:100% fills the grown section.
+ */
 .commerce-subscriptions-wrapper,
 .commerce-subscriptions {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
   box-sizing: border-box;
-}
-
-@media (min-width: 900px) {
-  body.columns main > .section.commerce-subscriptions-container,
-  body.columns main > .section.commerce-account-header-container {
-    min-width: 0;
-    max-width: var(--column-width);
-  }
-
-  body.columns main > .section.commerce-account-sidebar-container {
-    flex: 0 0 var(--column-width);
-    max-width: var(--column-width);
-    min-width: 0;
-  }
+  width: 42rem;
+  min-width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
 }

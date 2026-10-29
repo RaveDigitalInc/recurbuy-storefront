@@ -31,6 +31,21 @@ function normalizeSku(value) {
 }
 
 /**
+ * @param {Record<string, any>|null|undefined} product
+ * @returns {string[]}
+ */
+function productSkuCandidates(product) {
+  if (!product || typeof product !== 'object') return [];
+  const configured = product.configuredVariant || product.configured_variant || {};
+  return [
+    product.sku,
+    product.topLevelSku,
+    product.parentSku,
+    configured.sku,
+  ].map(normalizeSku).filter(Boolean);
+}
+
+/**
  * Prefer configurable parent id for AccS (same as mount-pdp eligibility).
  * @param {Record<string, any>|null|undefined} product
  */
@@ -154,8 +169,8 @@ function mountMiniPdp(root, { registerSelectionProvider, state }) {
     matches(skus) {
       const data = events.lastPayload('pdp/data', { scope: SCOPE })
         || events.lastPayload('pdp/data');
-      const own = normalizeSku(data?.sku);
-      return own !== '' && skus.includes(own);
+      const own = productSkuCandidates(data);
+      return own.some((sku) => skus.includes(sku));
     },
     getSelection: () => controller.getSelection(),
     isSelectionValid: () => controller.isSelectionValid(),

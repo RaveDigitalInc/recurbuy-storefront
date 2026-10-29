@@ -101,13 +101,18 @@ export const CartPayloadAdapter = {
       asEnteredOptionsList(configurationValues.enteredOptions),
     );
 
-    if (parentSku && parentSku !== sku) {
+    const parentIsDistinct = typeof parentSku === 'string'
+      && parentSku.trim() !== ''
+      && typeof sku === 'string'
+      && parentSku.trim().toLowerCase() !== sku.trim().toLowerCase();
+
+    if (parentIsDistinct) {
       base.parentSku = parentSku;
     }
 
     if (!selection || selection.purchaseType === 'one_time') {
       saveSelectionForSku(sku, { purchaseType: 'one_time' });
-      if (parentSku && parentSku !== sku) {
+      if (parentIsDistinct) {
         saveSelectionForSku(parentSku, { purchaseType: 'one_time' });
       }
       enteredOptions = withoutCartLineEnteredOption(
