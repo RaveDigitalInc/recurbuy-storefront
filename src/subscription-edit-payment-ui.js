@@ -13,6 +13,7 @@ export const EDIT_PAYMENT_LABELS = {
   title: 'Edit Payment Details',
   back: 'Back to Subscription',
   currentMethod: 'Current payment method',
+  currentMissing: 'No card on this subscription yet. Choose a saved card below.',
   chooseCard: 'Choose a saved card',
   save: 'Save',
   cancel: 'Cancel',
@@ -106,7 +107,7 @@ export function renderEditPaymentForm(input) {
   const submitting = Boolean(input.submitting);
   const incrementId = typeof input.incrementId === 'string' ? input.incrementId : '';
 
-  const currentBody = resolveCurrentPaymentBody(input, tokens);
+  const currentBody = resolveCurrentPaymentBody(input, labels);
 
   if (!canEdit) {
     return `
@@ -177,36 +178,23 @@ ${tokens.map((token) => {
 }
 
 /**
+ * Current block must reflect the profile vault stamp only — never the radio preselect
+ * (first wallet card). APS Hosted Fields can charge a card that never entered Magento vault.
+ *
  * @param {{
  *   currentHtml?: string|null,
  *   currentLabel?: string|null,
  *   currentDetails?: Record<string, unknown>|null,
- *   selectedPublicHash?: string|null,
  * }} input
- * @param {Array<{
- *   public_hash: string,
- *   label?: string,
- *   details?: Record<string, unknown>|null,
- * }>} tokens
+ * @param {typeof EDIT_PAYMENT_LABELS} labels
  * @returns {string}
  */
-function resolveCurrentPaymentBody(input, tokens) {
+function resolveCurrentPaymentBody(input, labels) {
   // Prefer client-side AccS markup from details so placeholders like UNKNOWN never leak
   // from a stale server `html` payload.
   const fromDetails = renderVaultCreditCardHtml(input.currentDetails);
   if (fromDetails) {
     return fromDetails;
-  }
-
-  const selected = typeof input.selectedPublicHash === 'string' ? input.selectedPublicHash : '';
-  const matched = selected
-    ? tokens.find((token) => token.public_hash === selected)
-    : null;
-  if (matched) {
-    const matchedBody = renderSavedCardBody(matched);
-    if (matchedBody) {
-      return matchedBody;
-    }
   }
 
   if (typeof input.currentHtml === 'string' && input.currentHtml.trim() !== '') {
@@ -217,7 +205,7 @@ function resolveCurrentPaymentBody(input, tokens) {
     return `<strong>${escapeHtml(input.currentLabel.trim())}</strong>`;
   }
 
-  return '';
+  return `<span class="recurbuy-edit-payment__current-missing">${escapeHtml(labels.currentMissing)}</span>`;
 }
 
 /**

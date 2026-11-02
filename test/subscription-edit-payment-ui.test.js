@@ -48,7 +48,7 @@ describe('subscription edit payment UI', () => {
     assert.match(html, />Save</);
   });
 
-  it('resolves current card from matched selected token when currentDetails absent', () => {
+  it('does not treat radio preselect as Current when profile has no vault stamp', () => {
     const html = renderEditPaymentForm({
       profileId: 8,
       isEditPaymentAvailable: true,
@@ -63,8 +63,12 @@ describe('subscription edit payment UI', () => {
     });
 
     assert.match(html, /Current payment method/);
-    assert.match(html, /\*\*\*\*2222/);
-    assert.match(html, /06\/2029/);
+    assert.match(html, /No card on this subscription yet/);
+    const currentBody = html.match(
+      /recurbuy-edit-payment__current-body">([\s\S]*?)<\/div>\s*<form/,
+    )?.[1] ?? '';
+    assert.doesNotMatch(currentBody, /\*\*\*\*2222/);
+    assert.match(html, /\*\*\*\*2222/); // still listed as a choosable saved card
   });
 
   it('shows unavailable when edit payment flag is off', () => {

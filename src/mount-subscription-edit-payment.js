@@ -221,13 +221,17 @@ export function mountSubscriptionEditPayment(rootEl, options) {
 
       const tokens = Array.isArray(config.saved_payment_tokens) ? config.saved_payment_tokens : [];
       const currentHash = typeof config.current?.payment_public_hash === 'string'
-        ? config.current.payment_public_hash
+        ? config.current.payment_public_hash.trim()
         : '';
-      const matchedToken = currentHash
+      const hasProfileVault = currentHash !== '';
+      const matchedToken = hasProfileVault
         ? tokens.find((token) => token.public_hash === currentHash)
         : null;
-      const resolvedCurrent = resolveCurrentVaultDisplay(config.current, matchedToken);
-      const selectedFromCurrent = tokens.some((token) => token.public_hash === currentHash)
+      // Profile stamp only — do not decorate Current from wallet[0] when hash is missing.
+      const resolvedCurrent = hasProfileVault
+        ? resolveCurrentVaultDisplay(config.current, matchedToken)
+        : { label: '', details: null, html: '' };
+      const selectedFromCurrent = hasProfileVault && tokens.some((token) => token.public_hash === currentHash)
         ? currentHash
         : (tokens[0]?.public_hash ?? null);
 
