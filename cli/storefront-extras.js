@@ -3,18 +3,15 @@
  *
  * RecurBuy no longer text-patches stock Adobe `decorate()` bodies.
  * Behavior ships in the package (FetchGraphQL hooks, auto-mount, cart UI runtime).
- * This file only: subscriptions page stub and config key placeholders.
+ * This file only: Account page stubs (list + scaffolds) and config key placeholders.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { listAllSubscriptionContentDocuments } from './account-pages.js';
 import {
   REQUIRED_CONFIG_KEYS, readText, resolvePath, writeText,
 } from './lib.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const TEMPLATES = path.join(__dirname, '..', 'templates');
 
 /**
  * Content + config only. Used by `init`.
@@ -33,29 +30,34 @@ export function runEnsureStorefrontExtras(options) {
 }
 
 function ensureSubscriptionsContent(cwd, ctx) {
-  const candidates = [
-    ['customer', 'subscriptions.html'],
-    ['content', 'customer', 'subscriptions.html'],
-  ];
-  const existing = candidates.some((parts) => fs.existsSync(resolvePath(cwd, ...parts)));
-  if (existing) {
-    ctx.report.push('subscriptions page: already present');
-    return;
-  }
-
-  const destDir = fs.existsSync(resolvePath(cwd, 'customer'))
+  const preferCustomerRoot = fs.existsSync(resolvePath(cwd, 'customer'));
+  const destRoot = preferCustomerRoot
     ? resolvePath(cwd, 'customer')
     : resolvePath(cwd, 'content', 'customer');
-  const template = path.join(TEMPLATES, 'content', 'subscriptions.html');
-  if (!fs.existsSync(template)) {
-    ctx.warnings.push('subscriptions.html template missing in package');
-    return;
-  }
-  const dest = path.join(destDir, 'subscriptions.html');
-  ctx.report.push(`${path.relative(cwd, dest)}: create`);
-  if (!ctx.dryRun) {
-    fs.mkdirSync(destDir, { recursive: true });
-    fs.copyFileSync(template, dest);
+
+  for (const doc of listAllSubscriptionContentDocuments()) {
+    // DA path is e.g. customer/subscriptions/detail.html → relative under customer/
+    const relativeUnderCustomer = doc.daPath.replace(/^customer\//, '');
+    const dest = path.join(destRoot, relativeUnderCustomer);
+    const altDest = preferCustomerRoot
+      ? resolvePath(cwd, 'content', 'customer', relativeUnderCustomer)
+      : resolvePath(cwd, 'customer', relativeUnderCustomer);
+
+    if (fs.existsSync(dest) || fs.existsSync(altDest)) {
+      ctx.report.push(`${doc.docPath}: already present`);
+      continue;
+    }
+
+    if (!fs.existsSync(doc.templateFile)) {
+      ctx.warnings.push(`${path.basename(doc.templateFile)} template missing in package`);
+      continue;
+    }
+
+    ctx.report.push(`${path.relative(cwd, dest)}: create`);
+    if (!ctx.dryRun) {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(doc.templateFile, dest);
+    }
   }
 }
 

@@ -961,7 +961,8 @@
 }
 
 .recurbuy-subscriptions-list .message.empty,
-.recurbuy-subscriptions-list .message.error {
+.recurbuy-subscriptions-list .message.error,
+.recurbuy-subscriptions-list .message.success {
   padding: var(--spacing-medium);
   border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400);
   border-radius: var(--shape-border-radius-2);
@@ -970,6 +971,1136 @@
 
 .recurbuy-subscriptions-list .message.error {
   border-color: var(--color-alert-500, #db7070);
+}
+
+.recurbuy-subscriptions-list .message.success {
+  border-color: var(--color-positive-500, #378758);
+  background: var(--color-positive-200, #e5f2e9);
+}
+
+/* Magento profile_edit/index — subscription detail (RecurBuy root only). */
+.recurbuy-subscription-detail {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  color: var(--color-neutral-800);
+  overflow-x: clip;
+}
+
+.recurbuy-subscription-detail__shell {
+  display: grid;
+  gap: var(--spacing-medium);
+  width: 100%;
+  max-width: 100%;
+}
+
+.recurbuy-subscription-detail__nav {
+  margin: 0;
+}
+
+.recurbuy-subscription-detail__back {
+  font: var(--type-body-2-default-font, inherit);
+  color: var(--color-brand-700, inherit);
+  text-decoration: underline;
+}
+
+.recurbuy-subscription-detail__back:hover {
+  text-decoration: none;
+}
+
+.recurbuy-subscription-detail__card {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: var(--spacing-medium);
+  overflow: hidden;
+}
+
+.recurbuy-subscription-detail__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-medium);
+  margin-bottom: var(--spacing-medium);
+  padding-bottom: var(--spacing-medium);
+  border-bottom: var(--shape-border-width-1, 1px) solid var(--color-neutral-400);
+}
+
+.recurbuy-subscription-detail__eyebrow {
+  margin: 0 0 var(--spacing-xxsmall, 0.25rem);
+  font: var(--type-body-2-default-font, inherit);
+  color: var(--color-neutral-600);
+}
+
+.recurbuy-subscription-detail__title {
+  margin: 0 0 var(--spacing-xsmall, 0.35rem);
+  font: var(--type-headline-2-font, inherit);
+  font-size: var(--heading-font-size-l, 1.75rem);
+  font-weight: 700;
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.recurbuy-subscription-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-small);
+  align-items: center;
+  margin: 0;
+}
+
+.recurbuy-subscription-detail__meta .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: var(--color-neutral-200, #eee);
+  font: var(--type-body-2-default-font, inherit);
+}
+
+.recurbuy-subscription-detail__meta .status-icon {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-neutral-500);
+}
+
+.recurbuy-subscription-detail__meta .status-icon.status-active {
+  background: var(--color-positive-600, #2f7d32);
+}
+
+.recurbuy-subscription-detail__meta .status-icon.status-pending,
+.recurbuy-subscription-detail__meta .status-icon.status-waiting {
+  background: var(--color-warning-600, #c47d00);
+}
+
+.recurbuy-subscription-detail__meta .status-icon.status-suspended {
+  background: var(--color-alert-500, #db7070);
+}
+
+.recurbuy-subscription-detail__meta .status-icon.status-cancelled,
+.recurbuy-subscription-detail__meta .status-icon.status-canceled,
+.recurbuy-subscription-detail__meta .status-icon.status-expired {
+  background: var(--color-neutral-500);
+}
+
+.recurbuy-subscription-detail__top-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-small);
+}
+
+.recurbuy-subscription-detail__top-actions .action.primary {
+  appearance: none;
+  border: 0;
+  border-radius: var(--shape-border-radius-2, 4px);
+  padding: 0.55rem 1rem;
+  background: var(--color-brand-700, #222);
+  color: var(--color-neutral-50, #fff);
+  font: var(--type-body-1-strong-font, inherit);
+  cursor: pointer;
+}
+
+/* Detail must not inherit list table width:max-content (causes page scrollbar). */
+.recurbuy-subscription-detail .aw-sarp2-customer-subscriptions,
+.recurbuy-subscription-detail .aw-sarp2-customer-subscriptions .data.table {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.recurbuy-subscription-detail__table {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.recurbuy-subscription-detail__table table {
+  width: 100%;
+  max-width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.recurbuy-subscription-detail__table th,
+.recurbuy-subscription-detail__table td {
+  padding: var(--spacing-small) var(--spacing-xsmall, 0.5rem);
+  vertical-align: top;
+  border-bottom: var(--shape-border-width-1, 1px) solid var(--color-neutral-400);
+  text-align: left;
+  font: var(--type-body-2-default-font, inherit);
+  word-break: break-word;
+}
+
+.recurbuy-subscription-detail__table tr:last-child th,
+.recurbuy-subscription-detail__table tr:last-child td {
+  border-bottom: 0;
+}
+
+.recurbuy-subscription-detail__table th {
+  width: 32%;
+  color: var(--color-neutral-700);
+  font-weight: 600;
+}
+
+.recurbuy-subscription-detail__table td:nth-child(2) {
+  width: 48%;
+}
+
+.recurbuy-subscription-detail__table .col.actions {
+  width: 20%;
+  white-space: normal;
+}
+
+.recurbuy-subscription-detail__table .col.actions .action {
+  display: inline-block;
+  margin: 0 0.5rem 0.25rem 0;
+  color: var(--color-brand-700, inherit);
+  text-decoration: underline;
+  font: inherit;
+}
+
+.recurbuy-subscription-detail__table .col.actions .action:hover {
+  text-decoration: none;
+}
+
+.recurbuy-subscription-detail__table .col.products ul,
+.recurbuy-subscription-detail__table .col.actions ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.recurbuy-subscription-detail__table .col.products li.is-skipped {
+  opacity: 0.7;
+}
+
+.recurbuy-subscription-detail__table .started {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.recurbuy-subscription-detail__table .started .label {
+  color: var(--color-neutral-600);
+}
+
+/* Magento AccS vault card (payment_details/type/credit_card.phtml) — detail + edit-payment */
+.recurbuy-subscription-detail .credit-card.wrapper,
+.recurbuy-edit-payment .credit-card.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.recurbuy-subscription-detail .credit-card.wrapper .card-number,
+.recurbuy-subscription-detail .credit-card.wrapper .expiration-date,
+.recurbuy-subscription-detail .credit-card.wrapper .card-type,
+.recurbuy-edit-payment .credit-card.wrapper .card-number,
+.recurbuy-edit-payment .credit-card.wrapper .expiration-date,
+.recurbuy-edit-payment .credit-card.wrapper .card-type {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-subscription-detail .credit-card.wrapper .card-number > span:first-child,
+.recurbuy-subscription-detail .credit-card.wrapper .expiration-date > span:first-child,
+.recurbuy-edit-payment .credit-card.wrapper .card-number > span:first-child,
+.recurbuy-edit-payment .credit-card.wrapper .expiration-date > span:first-child {
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-subscription-detail .credit-card.wrapper .card-type,
+.recurbuy-edit-payment .credit-card.wrapper .card-type {
+  color: var(--color-neutral-700, inherit);
+  opacity: 0.9;
+}
+
+.recurbuy-subscription-detail__payment-label {
+  text-transform: none;
+}
+
+.recurbuy-subscription-detail__skeleton {
+  padding: var(--spacing-medium) 0;
+}
+
+.recurbuy-subscription-detail .message {
+  padding: var(--spacing-medium);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400);
+  border-radius: var(--shape-border-radius-2);
+}
+
+.recurbuy-subscription-detail .message.error {
+  border-color: var(--color-alert-500, #db7070);
+}
+
+.recurbuy-subscription-detail .message.success {
+  border-color: var(--color-positive-500, #378758);
+  background: var(--color-positive-200, #e5f2e9);
+}
+
+@media (width <= 768px) {
+  .recurbuy-subscription-detail__table table,
+  .recurbuy-subscription-detail__table tbody,
+  .recurbuy-subscription-detail__table tr,
+  .recurbuy-subscription-detail__table th,
+  .recurbuy-subscription-detail__table td {
+    display: block;
+    width: 100%;
+  }
+
+  .recurbuy-subscription-detail__table tr {
+    padding: var(--spacing-small) 0;
+    border-bottom: var(--shape-border-width-1, 1px) solid var(--color-neutral-400);
+  }
+
+  .recurbuy-subscription-detail__table th,
+  .recurbuy-subscription-detail__table td {
+    border-bottom: 0;
+    padding: 0.15rem 0;
+  }
+
+  .recurbuy-subscription-detail__table th {
+    color: var(--color-neutral-600);
+    font-weight: 600;
+  }
+}
+
+/* Edit plan — AccS type tokens + theme colors (inherit dark brand) */
+.recurbuy-edit-plan {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 48rem;
+  overflow-x: hidden;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-plan *,
+.recurbuy-edit-plan *::before,
+.recurbuy-edit-plan *::after {
+  box-sizing: border-box;
+}
+
+.recurbuy-edit-plan__nav {
+  margin-bottom: var(--spacing-medium, 1.5rem);
+}
+
+.recurbuy-edit-plan__nav .action.back {
+  color: inherit;
+  text-decoration: underline;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-plan__nav .action.back:hover {
+  text-decoration: none;
+}
+
+.recurbuy-edit-plan__header {
+  display: grid;
+  gap: var(--spacing-xxsmall, 0.35rem);
+  margin-bottom: var(--spacing-large, 1.75rem);
+}
+
+.recurbuy-edit-plan__title {
+  margin: 0;
+  color: inherit;
+  font: var(--type-headline-2-default-font, var(--type-headline-2-strong-font, inherit));
+  letter-spacing: var(--type-headline-2-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-plan__meta {
+  margin: 0;
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+  opacity: 0.85;
+}
+
+.recurbuy-edit-plan__card {
+  display: grid;
+  gap: var(--spacing-medium, 1.5rem);
+  padding: var(--spacing-large, 1.75rem);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-3, 0.75rem);
+  background: transparent;
+}
+
+.recurbuy-edit-plan__products {
+  margin: 0;
+}
+
+.recurbuy-edit-plan__products-label {
+  display: block;
+  margin-bottom: var(--spacing-xsmall, 0.5rem);
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-2-strong-font, var(--type-body-1-strong-font, inherit));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.recurbuy-edit-plan__products ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recurbuy-edit-plan__products li {
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-plan__current {
+  margin: 0;
+  padding: var(--spacing-medium, 1.15rem);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: baseline;
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: var(--color-neutral-100, transparent);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-300, currentColor);
+}
+
+.recurbuy-edit-plan__current .label {
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-1-default-font, inherit);
+  opacity: 0.85;
+}
+
+.recurbuy-edit-plan__current strong {
+  color: inherit;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-plan__form {
+  display: grid;
+  gap: var(--spacing-medium, 1.5rem);
+  margin: 0;
+}
+
+.recurbuy-edit-plan__form .fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.recurbuy-edit-plan__form legend {
+  margin: 0 0 var(--spacing-small, 0.85rem);
+  padding: 0;
+  color: inherit;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-plan__options {
+  display: grid;
+  gap: var(--spacing-small, 0.85rem);
+}
+
+.recurbuy-edit-plan__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.recurbuy-edit-plan__option:hover {
+  border-color: var(--color-brand-500, currentColor);
+}
+
+.recurbuy-edit-plan__option:has(input:checked) {
+  border-color: var(--color-brand-700, currentColor);
+  background: var(--color-opacity-16, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-brand-700, currentColor);
+}
+
+.recurbuy-edit-plan__option input {
+  margin: 0.45rem 0 0;
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  accent-color: var(--color-brand-700, currentColor);
+}
+
+.recurbuy-edit-plan__option-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+  word-break: break-word;
+}
+
+.recurbuy-edit-plan__form .actions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-medium, 1rem);
+  align-items: center;
+}
+
+.recurbuy-edit-plan__form .button.primary,
+.recurbuy-edit-plan__form .button.secondary {
+  /* AccS `.button` sizing — do not force type-button-1 */
+  white-space: normal;
+}
+
+.recurbuy-edit-plan__skeleton {
+  margin: 0;
+}
+
+.recurbuy-edit-plan .message {
+  margin: var(--spacing-small, 0.75rem) 0;
+  padding: var(--spacing-small, 0.85rem) var(--spacing-medium, 1rem);
+  border-radius: var(--shape-border-radius-1, 0.35rem);
+  font: var(--type-body-1-default-font, inherit);
+}
+
+.recurbuy-edit-plan .message.error {
+  background: var(--color-alert-200, transparent);
+  color: var(--color-alert-800, inherit);
+}
+
+/* Account edit next payment date — Magento profile_edit/nextPaymentDate */
+.recurbuy-edit-next-date {
+  max-width: 36rem;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-next-date__nav {
+  margin-bottom: var(--spacing-medium, 1.5rem);
+}
+
+.recurbuy-edit-next-date__nav .action.back {
+  color: inherit;
+  text-decoration: underline;
+  font: var(--type-body-1-default-font, inherit);
+}
+
+.recurbuy-edit-next-date__nav .action.back:hover {
+  opacity: 0.85;
+}
+
+.recurbuy-edit-next-date__header {
+  margin-bottom: var(--spacing-medium, 1.25rem);
+}
+
+.recurbuy-edit-next-date__title {
+  margin: 0 0 var(--spacing-xxsmall, 0.4rem);
+  color: inherit;
+  font: var(--type-headline-2-default-font, var(--type-headline-2-strong-font, inherit));
+  letter-spacing: var(--type-headline-2-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-next-date__meta {
+  margin: 0;
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-2-default-font, var(--type-body-1-default-font, inherit));
+  opacity: 0.9;
+}
+
+.recurbuy-edit-next-date__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-medium, 1rem);
+}
+
+.recurbuy-edit-next-date__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-medium, 1rem);
+}
+
+.recurbuy-edit-next-date__form .fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-small, 0.85rem);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.recurbuy-edit-next-date__form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin: 0;
+}
+
+.recurbuy-edit-next-date__form .label {
+  font: var(--type-body-1-strong-font, inherit);
+}
+
+.recurbuy-edit-next-date__form .input-text {
+  width: 100%;
+  max-width: 16rem;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.7rem;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: transparent;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+}
+
+.recurbuy-edit-next-date__form .actions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-medium, 1rem);
+  align-items: center;
+}
+
+.recurbuy-edit-next-date__form .button.primary,
+.recurbuy-edit-next-date__form .button.secondary {
+  white-space: normal;
+}
+
+.recurbuy-edit-next-date__skeleton {
+  margin: 0;
+}
+
+.recurbuy-edit-next-date .message {
+  margin: var(--spacing-small, 0.75rem) 0;
+  padding: var(--spacing-small, 0.85rem) var(--spacing-medium, 1rem);
+  border-radius: var(--shape-border-radius-1, 0.35rem);
+  font: var(--type-body-1-default-font, inherit);
+}
+
+.recurbuy-edit-next-date .message.error {
+  background: var(--color-alert-200, transparent);
+  color: var(--color-alert-800, inherit);
+}
+
+/* Account edit payment — Magento profile_edit/payment (offline methods) */
+.recurbuy-edit-payment {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 48rem;
+  overflow-x: hidden;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-payment *,
+.recurbuy-edit-payment *::before,
+.recurbuy-edit-payment *::after {
+  box-sizing: border-box;
+}
+
+.recurbuy-edit-payment__nav {
+  margin-bottom: var(--spacing-medium, 1.5rem);
+}
+
+.recurbuy-edit-payment__nav .action.back {
+  color: inherit;
+  text-decoration: underline;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-payment__nav .action.back:hover {
+  text-decoration: none;
+}
+
+.recurbuy-edit-payment__header {
+  display: grid;
+  gap: var(--spacing-xxsmall, 0.35rem);
+  margin-bottom: var(--spacing-large, 1.75rem);
+}
+
+.recurbuy-edit-payment__title {
+  margin: 0;
+  color: inherit;
+  font: var(--type-headline-2-default-font, var(--type-headline-2-strong-font, inherit));
+  letter-spacing: var(--type-headline-2-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-payment__meta {
+  margin: 0;
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+  opacity: 0.85;
+}
+
+.recurbuy-edit-payment__card {
+  display: grid;
+  gap: var(--spacing-medium, 1.5rem);
+  padding: var(--spacing-large, 1.75rem);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-3, 0.75rem);
+  background: transparent;
+}
+
+.recurbuy-edit-payment__current-body {
+  margin: 0;
+}
+
+.recurbuy-edit-payment__current {
+  margin: 0;
+  padding: var(--spacing-medium, 1.15rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: var(--color-neutral-100, transparent);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-300, currentColor);
+}
+
+.recurbuy-edit-payment__current .label {
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-1-default-font, inherit);
+  opacity: 0.85;
+}
+
+.recurbuy-edit-payment__current strong {
+  color: inherit;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-payment__form {
+  display: grid;
+  gap: var(--spacing-medium, 1.5rem);
+  margin: 0;
+}
+
+.recurbuy-edit-payment__form .fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.recurbuy-edit-payment__form legend {
+  margin: 0 0 var(--spacing-small, 0.85rem);
+  padding: 0;
+  color: inherit;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-payment__options {
+  display: grid;
+  gap: var(--spacing-small, 0.85rem);
+}
+
+.recurbuy-edit-payment__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.recurbuy-edit-payment__option:hover {
+  border-color: var(--color-brand-500, currentColor);
+}
+
+.recurbuy-edit-payment__option:has(input:checked) {
+  border-color: var(--color-brand-700, currentColor);
+  background: var(--color-opacity-16, transparent);
+  box-shadow: inset 0 0 0 1px var(--color-brand-700, currentColor);
+}
+
+.recurbuy-edit-payment__option input {
+  margin: 0.45rem 0 0;
+  flex: 0 0 auto;
+  width: 1.35rem;
+  height: 1.35rem;
+  accent-color: var(--color-brand-700, currentColor);
+}
+
+.recurbuy-edit-payment__option-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 0.25rem;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+  word-break: break-word;
+}
+
+.recurbuy-edit-payment__option-title {
+  color: inherit;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-payment__option-meta {
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-2-default-font, var(--type-body-1-default-font, inherit));
+  letter-spacing: var(--type-body-2-default-letter-spacing, normal);
+  opacity: 0.85;
+}
+
+.recurbuy-edit-payment__form .actions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-medium, 1rem);
+  align-items: center;
+}
+
+.recurbuy-edit-payment__form .button.primary,
+.recurbuy-edit-payment__form .button.secondary {
+  white-space: normal;
+}
+
+.recurbuy-edit-payment__skeleton {
+  margin: 0;
+}
+
+.recurbuy-edit-payment .message {
+  margin: var(--spacing-small, 0.75rem) 0;
+  padding: var(--spacing-small, 0.85rem) var(--spacing-medium, 1rem);
+  border-radius: var(--shape-border-radius-1, 0.35rem);
+  font: var(--type-body-1-default-font, inherit);
+}
+
+.recurbuy-edit-payment .message.error {
+  background: var(--color-alert-200, transparent);
+  color: var(--color-alert-800, inherit);
+}
+
+/* Account edit-item — AccS type tokens + theme colors (inherit dark brand) */
+.recurbuy-edit-item {
+  max-width: 48rem;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__nav {
+  margin-bottom: var(--spacing-medium, 1.5rem);
+}
+
+.recurbuy-edit-item__nav .action.back {
+  color: inherit;
+  text-decoration: underline;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__nav .action.back:hover {
+  text-decoration: none;
+}
+
+.recurbuy-edit-item__header {
+  margin-bottom: var(--spacing-large, 1.75rem);
+}
+
+.recurbuy-edit-item__title {
+  margin: 0 0 var(--spacing-xxsmall, 0.4rem);
+  color: inherit;
+  font: var(--type-headline-2-default-font, var(--type-headline-2-strong-font, inherit));
+  letter-spacing: var(--type-headline-2-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.65rem;
+  margin: 0;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__product-name {
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__product-sku {
+  color: var(--color-neutral-700, inherit);
+  opacity: 0.85;
+}
+
+.recurbuy-edit-item__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-large, 1.75rem);
+}
+
+.recurbuy-edit-item__configure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-medium, 1.5rem);
+}
+
+.recurbuy-edit-item__attribute,
+.recurbuy-edit-item__bundle-option,
+.recurbuy-edit-item__grouped-row,
+.recurbuy-edit-item__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-small, 0.85rem);
+}
+
+.recurbuy-edit-item__row-label {
+  margin: 0;
+  color: inherit;
+  font: var(--type-body-1-strong-font, inherit);
+  letter-spacing: var(--type-body-1-strong-letter-spacing, normal);
+  position: static;
+}
+
+.recurbuy-edit-item__swatches,
+.recurbuy-edit-item__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.recurbuy-edit-item__swatch {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: transparent;
+  color: inherit;
+  font: var(--type-body-2-default-font, var(--type-body-1-default-font, inherit));
+  letter-spacing: var(--type-body-2-default-letter-spacing, normal);
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.recurbuy-edit-item__swatch--color {
+  position: relative;
+  padding-left: 2.3rem;
+}
+
+.recurbuy-edit-item__swatch--color::before {
+  content: '';
+  position: absolute;
+  left: 0.65rem;
+  top: 50%;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.5rem;
+  border-radius: 999px;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-500, currentColor);
+  background: var(--rb-swatch, var(--color-neutral-500, currentColor));
+}
+
+.recurbuy-edit-item__swatch.is-selected {
+  border-color: var(--color-brand-700, currentColor);
+  box-shadow: inset 0 0 0 1px var(--color-brand-700, currentColor);
+  font: var(--type-body-2-strong-font, var(--type-body-1-strong-font, inherit));
+}
+
+.recurbuy-edit-item__swatch.is-disabled,
+.recurbuy-edit-item__swatch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.recurbuy-edit-item__choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.9rem;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: transparent;
+  color: inherit;
+  font: var(--type-body-2-default-font, var(--type-body-1-default-font, inherit));
+  cursor: pointer;
+}
+
+.recurbuy-edit-item__choice.is-selected {
+  border-color: var(--color-brand-700, currentColor);
+  box-shadow: inset 0 0 0 1px var(--color-brand-700, currentColor);
+}
+
+.recurbuy-edit-item__qty {
+  width: 5.5rem;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.7rem;
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  border-radius: var(--shape-border-radius-2, 0.5rem);
+  background: transparent;
+  color: inherit;
+  font: var(--type-body-1-default-font, inherit);
+  letter-spacing: var(--type-body-1-default-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__selection {
+  margin: 0;
+  color: var(--color-neutral-700, inherit);
+  font: var(--type-body-2-default-font, var(--type-body-1-default-font, inherit));
+  opacity: 0.9;
+}
+
+.recurbuy-edit-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-medium, 1rem);
+  align-items: center;
+  padding-top: var(--spacing-xsmall, 0.5rem);
+}
+
+.recurbuy-edit-item__actions .button.primary,
+.recurbuy-edit-item__actions .button.secondary {
+  /* Native AccS `.button` size */
+  white-space: normal;
+}
+
+.recurbuy-edit-item__modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-medium, 1.25rem);
+}
+
+.recurbuy-edit-item__modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: var(--color-opacity-24, rgb(0 0 0 / 45%));
+}
+
+.recurbuy-edit-item__modal-panel {
+  position: relative;
+  width: min(100%, 32rem);
+  padding: var(--spacing-large, 1.75rem);
+  border-radius: var(--shape-border-radius-3, 0.75rem);
+  border: var(--shape-border-width-1, 1px) solid var(--color-neutral-400, currentColor);
+  background: var(--color-neutral-50, inherit);
+  color: inherit;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 22%);
+}
+
+.recurbuy-edit-item__modal-panel h2 {
+  margin: 0 0 var(--spacing-medium, 1.25rem);
+  color: inherit;
+  font: var(--type-headline-2-strong-font, inherit);
+  letter-spacing: var(--type-headline-2-strong-letter-spacing, normal);
+}
+
+.recurbuy-edit-item__modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-small, 0.75rem);
+}
+
+.recurbuy-edit-item__modal-actions .button {
+  white-space: normal;
+}
+
+.recurbuy-edit-item .message {
+  margin: 0;
+  padding: var(--spacing-small, 0.85rem) var(--spacing-medium, 1rem);
+  border-radius: var(--shape-border-radius-1, 0.35rem);
+  font: var(--type-body-1-default-font, inherit);
+}
+
+.recurbuy-edit-item .message.error {
+  background: var(--color-alert-200, transparent);
+  color: var(--color-alert-800, inherit);
+}
+
+/* Generic account AccS success flash (detail + account shell). */
+.recurbuy-account-scaffold .message.success,
+[class*="recurbuy-subscription"] .message.success,
+[class*="recurbuy-edit-"] .message.success {
+  border-color: var(--color-positive-500, #378758);
+  background: var(--color-positive-200, #e5f2e9);
+}
+
+/* Account edit scaffolds (address/payment/…) */
+.recurbuy-account-scaffold {
+  color: var(--color-neutral-800);
+}
+
+
+.recurbuy-account-scaffold__nav {
+  margin-bottom: var(--spacing-medium);
+}
+
+.recurbuy-account-scaffold__header {
+  margin-bottom: var(--spacing-medium);
+}
+
+.recurbuy-account-scaffold__title {
+  margin: 0 0 var(--spacing-xsmall, 0.25rem);
+  font-size: var(--heading-font-size-l, 1.5rem);
+}
+
+.recurbuy-account-scaffold__meta {
+  margin: 0;
+  color: var(--color-neutral-600);
+}
+
+.recurbuy-account-scaffold__note {
+  margin: var(--spacing-small) 0 0;
+  font-size: 0.875rem;
+  color: var(--color-neutral-600);
+}
+
+.recurbuy-account-scaffold__table table {
+  width: 100%;
+}
+
+.recurbuy-account-scaffold__form .field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xsmall, 0.25rem);
+  margin-bottom: var(--spacing-medium);
+}
+
+.recurbuy-account-scaffold__form textarea {
+  width: 100%;
+  min-height: 6rem;
+  padding: var(--spacing-small);
+}
+
+.recurbuy-account-scaffold__form .actions-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-small);
+  align-items: center;
 }
 
 /* In-DOM prompts (replaces window.alert / window.confirm) */

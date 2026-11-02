@@ -80,10 +80,12 @@ export function runUninstall(options) {
       report.push('delete scripts/initializers/recurbuy.js');
       if (!dryRun) fs.unlinkSync(initializerPath);
     }
-    const blockPath = resolvePath(cwd, 'blocks', 'commerce-subscriptions');
-    if (fs.existsSync(blockPath)) {
-      report.push('delete blocks/commerce-subscriptions');
-      if (!dryRun) fs.rmSync(blockPath, { recursive: true, force: true });
+    for (const name of ['commerce-subscriptions', 'commerce-subscription-account']) {
+      const blockPath = resolvePath(cwd, 'blocks', name);
+      if (fs.existsSync(blockPath)) {
+        report.push(`delete blocks/${name}`);
+        if (!dryRun) fs.rmSync(blockPath, { recursive: true, force: true });
+      }
     }
     const dropinPath = resolvePath(cwd, 'scripts', '__dropins__', 'storefront-recurbuy');
     if (fs.existsSync(dropinPath)) {

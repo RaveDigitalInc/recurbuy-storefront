@@ -3,8 +3,8 @@
  *
  * 1. IMS auth (same as publish-content)
  * 2. Strip Subscriptions row from customer/sidebar-fragment (keep other menu items)
- * 3. DELETE customer/subscriptions.html from DA
- * 4. DELETE live + preview for the subscriptions path; re-publish sidebar fragment
+ * 3. DELETE list + detail/edit Account pages from DA
+ * 4. DELETE live + preview for those paths; re-publish sidebar fragment
  */
 
 import { resolveDaToken } from './da-auth.js';
@@ -17,11 +17,14 @@ import {
 } from './da-client.js';
 import { resolveDaSite } from './da-site.js';
 import {
+  listAllSubscriptionContentDocuments,
+  SUBSCRIPTIONS_LIST_DOC_PATH,
+} from './account-pages.js';
+import {
   normalizeSidebarDocument,
   removeSubscriptionsSidebarItem,
 } from './sidebar-fragment.js';
 
-const SUBSCRIPTIONS_DA_PATH = 'customer/subscriptions.html';
 const SIDEBAR_DA_PATH = 'customer/sidebar-fragment.html';
 
 /**
@@ -61,6 +64,7 @@ export async function runUnpublishContent(options) {
 
   const report = [];
   const warnings = [];
+  const documents = listAllSubscriptionContentDocuments();
 
   const site = resolveDaSite({
     cwd, org, repo, branch,
@@ -69,9 +73,13 @@ export async function runUnpublishContent(options) {
 
   if (dryRun) {
     if (!skipSidebar) report.push(`[dry-run] would remove Subscriptions from ${SIDEBAR_DA_PATH}`);
-    report.push(`[dry-run] would DELETE ${SUBSCRIPTIONS_DA_PATH}`);
+    for (const doc of documents) {
+      report.push(`[dry-run] would DELETE ${doc.daPath}`);
+    }
     if (!skipPublish) {
-      report.push('[dry-run] would DELETE live+preview for customer/subscriptions');
+      for (const doc of documents) {
+        report.push(`[dry-run] would DELETE live+preview for ${doc.docPath}`);
+      }
       if (!skipSidebar) report.push('[dry-run] would preview+live sidebar-fragment');
     }
     return { report, warnings, failed: false };
@@ -125,51 +133,55 @@ export async function runUnpublishContent(options) {
     report.push('sidebar: skipped (--skip-sidebar)');
   }
 
-  // --- delete subscriptions page in DA ---
-  try {
-    const del = await deleteDaSource({
-      token,
-      org: site.org,
-      repo: site.repo,
-      daPath: SUBSCRIPTIONS_DA_PATH,
-    });
-    if (del.missing) {
-      report.push(`DELETE ${SUBSCRIPTIONS_DA_PATH}: already absent`);
-    } else {
-      report.push(`DELETE ${SUBSCRIPTIONS_DA_PATH} → ${del.status}`);
+  // --- delete Account pages in DA ---
+  for (const doc of documents) {
+    try {
+      const del = await deleteDaSource({
+        token,
+        org: site.org,
+        repo: site.repo,
+        daPath: doc.daPath,
+      });
+      if (del.missing) {
+        report.push(`DELETE ${doc.daPath}: already absent`);
+      } else {
+        report.push(`DELETE ${doc.daPath} → ${del.status}`);
+      }
+    } catch (error) {
+      warnings.push(`Failed to delete ${doc.daPath}: ${error.message}`);
+      if (error.status === 403) {
+        warnings.push('DA returned 403: this Adobe user cannot write this org/repo.');
+        warnings.push('1) Confirm --org/--repo match your site in da.live.');
+        warnings.push('2) Ask a DA admin to grant your Adobe email write at https://da.live/config');
+        warnings.push('3) Re-auth: npx recurbuy-eds unpublish-content --login --org=… --repo=…');
+        warnings.push('See package README → Account page + menu (publish-content).');
+      }
+      return { report, warnings, failed: true };
     }
-  } catch (error) {
-    warnings.push(`Failed to delete subscriptions page: ${error.message}`);
-    if (error.status === 403) {
-      warnings.push('DA returned 403: this Adobe user cannot write this org/repo.');
-      warnings.push('1) Confirm --org/--repo match your site in da.live.');
-      warnings.push('2) Ask a DA admin to grant your Adobe email write at https://da.live/config');
-      warnings.push('3) Re-auth: npx recurbuy-eds unpublish-content --login --org=… --repo=…');
-      warnings.push('See package README → Account page + menu (publish-content).');
-    }
-    return { report, warnings, failed: true };
   }
 
-  // --- edge: unpublish subscriptions; republish sidebar ---
+  // --- edge: unpublish pages; republish sidebar ---
   if (!skipPublish) {
-    for (const action of ['live', 'preview']) {
-      try {
-        const result = await hlxLifecycle({
-          token,
-          org: site.org,
-          repo: site.repo,
-          branch: site.branch,
-          pathWithoutHtml: 'customer/subscriptions',
-          action,
-          method: 'DELETE',
-        });
-        report.push(
-          result.missing
-            ? `${action} DELETE customer/subscriptions: already absent`
-            : `${action} DELETE customer/subscriptions: ok`,
-        );
-      } catch (error) {
-        warnings.push(`customer/subscriptions ${action} unpublish failed: ${error.message}`);
+    for (const doc of documents) {
+      for (const action of ['live', 'preview']) {
+        try {
+          const result = await hlxLifecycle({
+            token,
+            org: site.org,
+            repo: site.repo,
+            branch: site.branch,
+            pathWithoutHtml: doc.docPath,
+            action,
+            method: 'DELETE',
+          });
+          report.push(
+            result.missing
+              ? `${action} DELETE ${doc.docPath}: already absent`
+              : `${action} DELETE ${doc.docPath}: ok`,
+          );
+        } catch (error) {
+          warnings.push(`${doc.docPath} ${action} unpublish failed: ${error.message}`);
+        }
       }
     }
 
@@ -204,12 +216,12 @@ export async function runUnpublishContent(options) {
     org: site.org,
     repo: site.repo,
     branch: site.branch,
-    pathWithoutHtml: 'customer/subscriptions',
+    pathWithoutHtml: SUBSCRIPTIONS_LIST_DOC_PATH,
   });
   report.push('');
   report.push(`Removed (or attempted) live page: ${urls.liveUrl}`);
   report.push('Next: npx recurbuy-eds uninstall [--remove-files] to roll back storefront code');
 
-  const failed = warnings.some((w) => /Failed to delete subscriptions/i.test(w));
+  const failed = warnings.some((w) => /Failed to delete /i.test(w));
   return { report, warnings, failed };
 }

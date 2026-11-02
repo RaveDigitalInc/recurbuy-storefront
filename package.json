@@ -1,6 +1,6 @@
 {
   "name": "@recurbuy/storefront-eds",
-  "version": "0.2.0",
+  "version": "0.2.20",
   "description": "RecurBuy subscription drop-in for Adobe Commerce Storefront (EDS, aem-boilerplate-commerce v11+). Installed under the npm alias @dropins/storefront-recurbuy so stock install:dropins vendors it.",
   "type": "module",
   "sideEffects": [
@@ -17,7 +17,8 @@
     "./render.js": "./render.js",
     "./graphql.js": "./graphql.js",
     "./containers/SubscriptionsList.js": "./containers/SubscriptionsList.js",
-    "./extend/initializer.js": "./extend/initializer.js",
+    "./containers/SubscriptionAccountPage.js": "./containers/SubscriptionAccountPage.js",
+    "./account/subscription-routes.js": "./account/subscription-routes.js",
     "./styles/recurbuy-storefront.css": "./styles/recurbuy-storefront.css",
     "./package.json": "./package.json"
   },
@@ -26,6 +27,7 @@
     "render.js",
     "graphql.js",
     "bin",
+    "account",
     "cli",
     "containers",
     "extend",

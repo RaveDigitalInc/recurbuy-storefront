@@ -19,6 +19,7 @@ import {
   readInstallState,
   readPackageIdentity,
 } from './install-state.js';
+import { ensureRecurBuyBlocks } from './copy-blocks.js';
 import { readText, resolvePath, writeText } from './lib.js';
 import { runEnsureStorefrontExtras } from './storefront-extras.js';
 import { resolveSuite } from './suite-resolve.js';
@@ -118,6 +119,7 @@ export function runUpgrade(options) {
   const blockSrc = path.join(TEMPLATES, 'blocks', 'commerce-subscriptions');
   const blockEntry = path.join(blockDest, 'commerce-subscriptions.js');
   if (fs.existsSync(path.join(blockSrc, 'commerce-subscriptions.js'))) {
+    keepLabel: 'keep (pass --refresh-templates to overwrite)',
     if (!fs.existsSync(blockEntry)) {
       report.push('blocks/commerce-subscriptions: create');
       if (!dryRun) {

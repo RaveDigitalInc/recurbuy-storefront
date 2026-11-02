@@ -12,6 +12,7 @@ import {
 } from './lib.js';
 import { applySuitePatches } from './apply-patches.js';
 import { resolveSuite } from './suite-resolve.js';
+import { ensureRecurBuyBlocks } from './copy-blocks.js';
 import { runEnsureStorefrontExtras } from './storefront-extras.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

@@ -5,6 +5,7 @@ import {
   persistShowCanceledSubscriptions,
   renewShopperProfile,
 } from './adapters/storefront-profiles-list-adapter.js';
+import { subscriptionAccountHref } from './account/subscription-routes.js';
 import { getShopperAuthToken } from './auth.js';
 import { escapeHtml } from './helpers/dom-html.js';
 import { ensureRecurBuyStyles } from './helpers/ensure-styles.js';
@@ -50,7 +51,7 @@ export function mountSubscriptionsList(rootEl, options = {}) {
   const loadRowActions = options.loadRowActions !== false;
   const getProfileHref = typeof options.getProfileHref === 'function'
     ? options.getProfileHref
-    : (row) => `/customer/subscriptions/detail?profile_id=${row.profile_id}`;
+    : (row) => subscriptionAccountHref('detail', { profileId: row.profile_id });
 
   /** @type {{ page: number, showCanceled: boolean|null, busy: boolean, destroyed: boolean }} */
   const state = {

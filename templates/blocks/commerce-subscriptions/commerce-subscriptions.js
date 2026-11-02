@@ -1,15 +1,26 @@
 import { getShopperAuthToken } from '@dropins/storefront-recurbuy/api.js';
+import {
+  resolveSubscriptionAccountPageId,
+  subscriptionAccountHref,
+} from '@dropins/storefront-recurbuy/account/subscription-routes.js';
 import { render as RecurBuy } from '@dropins/storefront-recurbuy/render.js';
+import SubscriptionAccountPage from '@dropins/storefront-recurbuy/containers/SubscriptionAccountPage.js';
 import SubscriptionsList from '@dropins/storefront-recurbuy/containers/SubscriptionsList.js';
 import {
   CUSTOMER_LOGIN_PATH,
-  CUSTOMER_PATH,
   checkIsAuthenticated,
   rootLink,
 } from '../../scripts/commerce.js';
 
 /**
- * My Subscriptions — thin EDS glue around RecurBuy SubscriptionsList container.
+ * My Subscriptions — list + detail/edit on ONE published DA page.
+ *
+ * List:   /customer/subscriptions
+ * Detail: /customer/subscriptions#rb/detail/91
+ * Edit:   /customer/subscriptions#rb/edit-plan/91
+ *
+ * Hash routing avoids extra DA docs and keeps the same document for Adobe config.
+ * Hash changes remount without a full page reload.
  */
 export default async function decorate(block) {
   if (!checkIsAuthenticated()) {
@@ -17,14 +28,54 @@ export default async function decorate(block) {
     return;
   }
 
-  const root = block.querySelector('[data-recurbuy-subscriptions-root]') || block;
-  RecurBuy.render(SubscriptionsList, {
-    getAuthToken: getShopperAuthToken,
-    onUnauthenticated: () => {
-      window.location.href = rootLink(CUSTOMER_LOGIN_PATH);
-    },
-    getProfileHref: (row) => rootLink(
-      `${CUSTOMER_PATH}/subscriptions/detail?profile_id=${encodeURIComponent(row.profile_id)}`,
-    ),
-  })(root);
+  const root = block.querySelector('[data-recurbuy-subscriptions-root]')
+    || block.querySelector('[data-recurbuy-account-root]')
+    || block;
+
+  /** @type {{ destroy?: () => void }|null} */
+  let active = null;
+
+  const mount = () => {
+    try {
+      active?.destroy?.();
+      active = null;
+
+      const pageId = resolveSubscriptionAccountPageId(
+        window.location.pathname,
+        window.location.search,
+        window.location.hash,
+      );
+
+      const onUnauthenticated = () => {
+        window.location.href = rootLink(CUSTOMER_LOGIN_PATH);
+      };
+
+      if (pageId) {
+        active = RecurBuy.render(SubscriptionAccountPage, {
+          page: pageId,
+          rootLink,
+          getAuthToken: getShopperAuthToken,
+          onUnauthenticated,
+        })(root);
+        return;
+      }
+
+      active = RecurBuy.render(SubscriptionsList, {
+        getAuthToken: getShopperAuthToken,
+        onUnauthenticated,
+        getProfileHref: (row) => subscriptionAccountHref('detail', {
+          profileId: row.profile_id,
+          rootLink,
+        }),
+      })(root);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Subscriptions UI failed to load';
+      root.innerHTML = `<div class="message error"><span>${message}</span></div>`;
+      // eslint-disable-next-line no-console
+      console.error('[RecurBuy] commerce-subscriptions decorate failed', error);
+    }
+  };
+
+  mount();
+  window.addEventListener('hashchange', mount);
 }

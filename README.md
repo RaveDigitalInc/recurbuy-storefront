@@ -103,9 +103,15 @@ Drop-in code is in **git**. The «My Subscriptions» page and the Account sideba
 `publish-content` will:
 
 1. Authenticate you to Adobe IMS (browser), unless a token is already cached / set
-2. Upload `customer/subscriptions.html` to DA
+2. Upload Account pages to DA:
+   - `customer/subscriptions.html` (list)
+   - Magento SARP account pages: `detail` + `edit-plan` + `edit-item` + `edit-next-payment-date` + `edit-payment` (saved vault cards); scaffold for `edit-address`
 3. Add a **Subscriptions** row to `customer/sidebar-fragment` (idempotent — no duplicate if the link exists)
 4. Preview + publish on Edge Delivery (`aem.page` / `aem.live`)
+
+List → **Edit** stays on the **same** published document via hash (no DA write needed):
+`/customer/subscriptions#rb/detail/91`, then `#rb/edit-plan/91`, `#rb/edit-address/91`, …
+Do **not** add bare local `customer/subscriptions/detail.html` overlays — without EDS wrapping they break the page. Legacy `?page=` and path URLs are still recognized if present.
 
 Run from the **storefront root**, after `init` + `install:dropins` (+ filled config for a working list page).
 

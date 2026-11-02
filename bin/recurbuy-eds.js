@@ -35,8 +35,8 @@ Usage:
 Commands:
   init               First-time scaffold + patches + templates (writes .recurbuy-eds.json)
   upgrade            After bumping the npm package: apply pending patches, refresh state
-  publish-content    Upload subscriptions page + Account sidebar to da.live, then preview/publish
-  unpublish-content  Remove DA page + sidebar link, unpublish from aem.live (before uninstall)
+  publish-content    Upload Account pages (list + detail/edit scaffolds) + sidebar to da.live
+  unpublish-content  Remove DA Account pages + sidebar link, unpublish from aem.live
   doctor             Verify code install, patch state, and live Account content
   uninstall          Rollback init (code only — does not delete DA pages)
   help               Show this help
@@ -45,7 +45,7 @@ Options:
   --dry-run              Print actions without writing / calling DA
   --remove-files         With uninstall: delete initializer, block, vendored drop-in
   --repatch              Re-evaluate stock patches (init/upgrade)
-  --refresh-templates    With upgrade: overwrite recurbuy.js + commerce-subscriptions from package
+  --refresh-templates    With upgrade: overwrite recurbuy.js + Account blocks from package
   --org=ORG              DA org from da.live (else DA_ORG / fstab.yaml)
   --repo=REPO            DA repo from da.live (else DA_REPO / fstab.yaml)
   --branch=BRANCH        EDS branch (default main; else DA_BRANCH)
