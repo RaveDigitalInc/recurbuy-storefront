@@ -1,6 +1,6 @@
 {
   "name": "@recurbuy/storefront-eds",
-  "version": "0.2.21",
+  "version": "0.2.24",
   "description": "RecurBuy subscription drop-in for Adobe Commerce Storefront (EDS, aem-boilerplate-commerce v11+). Installed under the npm alias @dropins/storefront-recurbuy so stock install:dropins vendors it.",
   "type": "module",
   "sideEffects": [

@@ -35,8 +35,8 @@ describe('createRecurbuyCart', () => {
     cart.install();
 
     assert.equal(installs, 1);
-    assert.equal(client.beforeHooks.length, 1);
-    assert.equal(client.afterHooks.length, 1);
+    assert.equal(client.beforeHooks.length, 2);
+    assert.equal(client.afterHooks.length, 2);
   });
 
   it('gives every extension the instance selection registry', () => {

@@ -74,6 +74,16 @@ export function runUninstall(options) {
     if (cartChanged && !dryRun) writeText(cartInitPath, cartInit);
   }
 
+  const checkoutInitPath = resolvePath(cwd, 'scripts', 'initializers', 'checkout.js');
+  if (fs.existsSync(checkoutInitPath)) {
+    let checkoutInit = readText(checkoutInitPath);
+    if (checkoutInit.includes("import './recurbuy.js';")) {
+      checkoutInit = checkoutInit.replace(/^[ \t]*import '\.\/recurbuy\.js';[ \t]*\n/m, '');
+      report.push("scripts/initializers/checkout.js: remove import './recurbuy.js'");
+      if (!dryRun) writeText(checkoutInitPath, checkoutInit);
+    }
+  }
+
   if (removeFiles) {
     const initializerPath = resolvePath(cwd, 'scripts', 'initializers', 'recurbuy.js');
     if (fs.existsSync(initializerPath)) {

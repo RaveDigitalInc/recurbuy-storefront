@@ -319,6 +319,7 @@ Runtime (no stock `decorate()` rewrites):
 |------|-----------|
 | PDP | auto-mount into `.product-details` + `pdp/*` events |
 | Add to cart | `FetchGraphQL` before/after hooks on `CORE_FETCH_GRAPHQL` |
+| Checkout save-card | same client: remember `createPaymentOrder`, `placeOrder` before-hook sends the enabler |
 | Cart line markers | after-hook reads `custom_attributes` (cart drop-in drops them while mapping) |
 | Cart / mini-cart / checkout | `cart/data` + DOM paint |
 | Mini-PDP edit | auto-mount + Update intercept |

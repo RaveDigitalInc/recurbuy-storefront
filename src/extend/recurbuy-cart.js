@@ -5,6 +5,7 @@
  */
 
 import { createCartMutationHooks } from './cart-mutation-hooks.js';
+import { createCheckoutPaymentHooks } from './checkout-payment-hooks.js';
 
 /**
  * @typedef {Object} RecurbuyCartApi
@@ -36,6 +37,11 @@ export function createRecurbuyCart({
   const hooks = createCartMutationHooks({
     client, refreshCart, events, prepareCartItem,
   });
+  const checkoutHooks = createCheckoutPaymentHooks({
+    client,
+    events,
+    fetchHost: typeof window !== 'undefined' ? window : null,
+  });
   const api = { registerSelectionProvider: hooks.registerSelectionProvider };
 
   /** @type {Array<() => void>} */
@@ -51,6 +57,7 @@ export function createRecurbuyCart({
       if (installed || disposed) return;
       installed = true;
       hooks.install();
+      checkoutHooks.install();
       extensions.forEach((extension) => {
         // A failing extension (e.g. markup missing on this page) must not
         // break the host page or the remaining extensions.
@@ -71,6 +78,7 @@ export function createRecurbuyCart({
       if (disposed) return;
       disposed = true;
       hooks.dispose();
+      checkoutHooks.dispose();
       while (disposers.length) {
         try {
           disposers.pop()();

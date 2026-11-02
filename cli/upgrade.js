@@ -115,24 +115,14 @@ export function runUpgrade(options) {
     }
   }
 
-  const blockDest = resolvePath(cwd, 'blocks', 'commerce-subscriptions');
-  const blockSrc = path.join(TEMPLATES, 'blocks', 'commerce-subscriptions');
-  const blockEntry = path.join(blockDest, 'commerce-subscriptions.js');
-  if (fs.existsSync(path.join(blockSrc, 'commerce-subscriptions.js'))) {
+  ensureRecurBuyBlocks({
+    cwd,
+    dryRun,
+    refresh: refreshTemplates,
     keepLabel: 'keep (pass --refresh-templates to overwrite)',
-    if (!fs.existsSync(blockEntry)) {
-      report.push('blocks/commerce-subscriptions: create');
-      if (!dryRun) {
-        fs.mkdirSync(path.dirname(blockDest), { recursive: true });
-        fs.cpSync(blockSrc, blockDest, { recursive: true });
-      }
-    } else if (refreshTemplates) {
-      report.push('blocks/commerce-subscriptions: refresh (--refresh-templates)');
-      if (!dryRun) fs.cpSync(blockSrc, blockDest, { recursive: true });
-    } else {
-      report.push('blocks/commerce-subscriptions: keep');
-    }
-  }
+    report,
+    warnings,
+  });
 
   const extras = runEnsureStorefrontExtras({ cwd, dryRun });
   extras.report.forEach((line) => report.push(line));

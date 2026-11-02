@@ -258,6 +258,30 @@ export async function runDoctor(options) {
     });
   }
 
+  const checkoutInit = resolvePath(cwd, 'scripts', 'initializers', 'checkout.js');
+  const checkoutInitSource = fs.existsSync(checkoutInit) ? readText(checkoutInit) : '';
+  if (checkoutInitSource.includes("import './recurbuy.js';")) {
+    add({
+      id: 'checkout-loader',
+      status: 'ok',
+      label: 'checkout initializer loads scripts/initializers/recurbuy.js',
+    });
+  } else if (!fs.existsSync(checkoutInit)) {
+    add({
+      id: 'checkout-loader',
+      status: 'fail',
+      label: 'scripts/initializers/checkout.js missing',
+      fix: 'Expected stock Adobe checkout initializer. Are you in the storefront root?',
+    });
+  } else {
+    add({
+      id: 'checkout-loader',
+      status: 'fail',
+      label: "scripts/initializers/checkout.js missing import './recurbuy.js'",
+      fix: 'Run: npx recurbuy-eds upgrade. If the suite patch fails, add manually: import \'./recurbuy.js\';',
+    });
+  }
+
   const configPath = resolvePath(cwd, 'config.json');
   const examplePath = resolvePath(cwd, 'config.example.json');
   if (fs.existsSync(configPath)) {

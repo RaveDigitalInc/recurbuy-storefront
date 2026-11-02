@@ -13,6 +13,12 @@
       "patch": "scripts.initializers.cart.js.patch"
     },
     {
+      "id": "checkout-loader",
+      "version": 1,
+      "file": "scripts/initializers/checkout.js",
+      "patch": "scripts.initializers.checkout.js.patch"
+    },
+    {
       "id": "import-map",
       "version": 1,
       "file": "head.html",
