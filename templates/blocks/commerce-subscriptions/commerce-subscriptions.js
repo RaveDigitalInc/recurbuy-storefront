@@ -1,8 +1,5 @@
 import { getShopperAuthToken } from '@dropins/storefront-recurbuy/api.js';
-import {
-  resolveSubscriptionAccountPageId,
-  subscriptionAccountHref,
-} from '@dropins/storefront-recurbuy/account/subscription-routes.js';
+import { resolveSubscriptionAccountPageId } from '@dropins/storefront-recurbuy/account/subscription-routes.js';
 import { render as RecurBuy } from '@dropins/storefront-recurbuy/render.js';
 import SubscriptionAccountPage from '@dropins/storefront-recurbuy/containers/SubscriptionAccountPage.js';
 import SubscriptionsList from '@dropins/storefront-recurbuy/containers/SubscriptionsList.js';
@@ -20,7 +17,7 @@ import {
  * Edit:   /customer/subscriptions#rb/edit-plan/91
  *
  * Hash routing avoids extra DA docs and keeps the same document for Adobe config.
- * Hash changes remount without a full page reload.
+ * Both containers mount the panel customer iframe; in-iframe navigation stays there.
  */
 export default async function decorate(block) {
   if (!checkIsAuthenticated()) {
@@ -53,7 +50,6 @@ export default async function decorate(block) {
       if (pageId) {
         active = RecurBuy.render(SubscriptionAccountPage, {
           page: pageId,
-          rootLink,
           getAuthToken: getShopperAuthToken,
           onUnauthenticated,
         })(root);
@@ -63,10 +59,6 @@ export default async function decorate(block) {
       active = RecurBuy.render(SubscriptionsList, {
         getAuthToken: getShopperAuthToken,
         onUnauthenticated,
-        getProfileHref: (row) => subscriptionAccountHref('detail', {
-          profileId: row.profile_id,
-          rootLink,
-        }),
       })(root);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Subscriptions UI failed to load';
