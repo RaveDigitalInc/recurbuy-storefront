@@ -1,3 +1,4 @@
+import { getShopperAuthToken } from '@dropins/storefront-recurbuy/api.js';
 import { render as RecurBuy } from '@dropins/storefront-recurbuy/render.js';
 import SubscriptionAccountPage from '@dropins/storefront-recurbuy/containers/SubscriptionAccountPage.js';
 import {
@@ -7,8 +8,8 @@ import {
 } from '../../scripts/commerce.js';
 
 /**
- * Subscription detail / edit scaffolds — Magento SARP profile_edit* parity stubs.
- * Page kind is resolved from the URL path under /customer/subscriptions/*.
+ * Subscription detail / edit — panel customer iframe.
+ * Page kind is resolved from the URL under /customer/subscriptions/*.
  */
 export default async function decorate(block) {
   if (!checkIsAuthenticated()) {
@@ -18,6 +19,9 @@ export default async function decorate(block) {
 
   const root = block.querySelector('[data-recurbuy-account-root]') || block;
   RecurBuy.render(SubscriptionAccountPage, {
-    rootLink,
+    getAuthToken: getShopperAuthToken,
+    onUnauthenticated: () => {
+      window.location.href = rootLink(CUSTOMER_LOGIN_PATH);
+    },
   })(root);
 }
