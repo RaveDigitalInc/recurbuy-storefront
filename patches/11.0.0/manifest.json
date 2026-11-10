@@ -29,6 +29,12 @@
       "version": 1,
       "file": "build.mjs",
       "patch": "build.mjs.patch"
+    },
+    {
+      "id": "section-metadata",
+      "version": 1,
+      "file": "scripts/commerce.js",
+      "patch": "scripts.commerce.js.patch"
     }
   ]
 }

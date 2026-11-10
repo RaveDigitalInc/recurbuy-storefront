@@ -1,0 +1,57 @@
+--- a/scripts/commerce.js
++++ b/scripts/commerce.js
+@@ -11,6 +11,8 @@ import { FetchGraphQL } from '@dropins/tools/fetch-graphql.js';
+ import {
+   getMetadata,
+   readBlockConfig,
++  toCamelCase,
++  toClassName,
+ } from './aem.js';
+ import initializeDropins from './initializers/index.js';
+ 
+@@ -880,6 +882,37 @@ function autolinkModals(element) {
+   });
+ }
+ 
++/**
++ * Apply authored Section Metadata to the section and remove the table
++ * so EDS does not load a missing `section-metadata` block (404).
++ * @param {Element} section
++ */
++function applySectionMetadata(section) {
++  const sectionMeta = section.querySelector('div.section-metadata');
++  if (!sectionMeta) return;
++
++  const meta = readBlockConfig(sectionMeta);
++  Object.keys(meta).forEach((key) => {
++    const value = meta[key];
++    if (key === 'style') {
++      String(value)
++        .split(',')
++        .map((style) => toClassName(style.trim()))
++        .filter(Boolean)
++        .forEach((style) => section.classList.add(style));
++      return;
++    }
++    section.dataset[toCamelCase(key)] = value;
++  });
++
++  const wrapper = sectionMeta.parentElement;
++  if (wrapper && wrapper !== section && wrapper.childElementCount === 1) {
++    wrapper.remove();
++  } else {
++    sectionMeta.remove();
++  }
++}
++
+ /**
+  * Decorates all sections in a container element.
+  * @param {Element} main The container element
+@@ -907,6 +940,7 @@ export function decorateSections(main) {
+     });
+     wrappers.forEach((wrapper) => section.append(wrapper));
+     section.classList.add('section');
++    applySectionMetadata(section);
+     section.dataset.sectionStatus = 'initialized';
+     section.style.display = 'none';
+   });
