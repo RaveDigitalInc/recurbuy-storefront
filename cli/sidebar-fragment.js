@@ -13,7 +13,7 @@ export const SUBSCRIPTIONS_SIDEBAR_ITEM_HTML = `<li>
       <ol>
         <li>Manage your subscriptions</li>
         <li>${SUBSCRIPTIONS_PATH}</li>
-        <li>PendingPayment</li>
+        <li>Delivery</li>
       </ol>
     </li>`;
 

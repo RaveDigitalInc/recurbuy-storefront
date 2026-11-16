@@ -238,7 +238,7 @@ Missing `customer/sidebar-fragment`, no rights, or non-standard markup. In da.li
 - Title: `Subscriptions`
 - Subtitle: e.g. `Manage your subscriptions`
 - Link: `/customer/subscriptions`
-- Icon: e.g. `PendingPayment` (any valid account sidebar icon)
+- Icon: e.g. `Delivery` (any valid account sidebar icon)
 
 #### Live 404 after «successful» publish
 
