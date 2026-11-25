@@ -5,11 +5,13 @@
  */
 
 import { events } from '@dropins/tools/event-bus.js';
-import { refreshCart } from '@dropins/storefront-cart/api.js';
+import { getCartDataFromCache, refreshCart } from '@dropins/storefront-cart/api.js';
+import { getShopperAuthToken } from '../auth.js';
 import { installCartLineOptionPdpHide } from '../helpers/cart-line-option.js';
 import { prepareSubscriptionCartItem } from '../subscription-add-to-cart.js';
 import { installCartModelTransformer } from './cart-model.js';
 import { installCartUiRuntime } from './cart-ui-runtime.js';
+import { installCheckoutSuccessRuntime } from './checkout-success-runtime.js';
 import { autoMountMiniPdp } from './mini-pdp-auto-mount.js';
 import { autoMountProductDetails } from './pdp-auto-mount.js';
 import { createRecurbuyCart } from './recurbuy-cart.js';
@@ -45,6 +47,11 @@ export function installRecurBuyStorefront({ cartClient }) {
       ({ registerSelectionProvider }) => autoMountProductDetails({ registerSelectionProvider }),
       ({ registerSelectionProvider }) => autoMountMiniPdp({ registerSelectionProvider }),
       () => installCartUiRuntime(),
+      () => installCheckoutSuccessRuntime({
+        events,
+        getAuthToken: getShopperAuthToken,
+        getCartData: getCartDataFromCache,
+      }),
     ],
   });
 
