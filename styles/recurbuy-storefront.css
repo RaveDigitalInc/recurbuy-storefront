@@ -798,3 +798,55 @@
   color: var(--color-neutral-800, #2d2d2d);
   font: var(--type-body-2-default-font, inherit);
 }
+
+/* Checkout success — subscription profile line under order number (SARP profiles_info.phtml) */
+.recurbuy-checkout-success {
+  text-align: center;
+  margin-top: calc(var(--spacing-xbig, 2rem) * -0.75);
+}
+
+.recurbuy-checkout-success__text {
+  margin: 0;
+  font: var(--type-body-1-default-font, inherit);
+  color: var(--color-neutral-800, #2d2d2d);
+  line-height: 1.5;
+}
+
+.recurbuy-checkout-success__link {
+  color: var(--color-brand-700, #376dce);
+  text-decoration: underline;
+}
+
+.recurbuy-checkout-success__link:hover {
+  color: var(--color-brand-800, #2653a5);
+}
+
+.recurbuy-checkout-success__id {
+  font-weight: 600;
+}
+
+.recurbuy-checkout-success__loading {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font: var(--type-body-2-default-font, inherit);
+  color: var(--color-neutral-600, #6b7280);
+  line-height: 1.5;
+}
+
+.recurbuy-checkout-success__spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-neutral-300, #d1d5db);
+  border-top-color: var(--color-neutral-700, #374151);
+  animation: recurbuy-checkout-success-spin 0.8s linear infinite;
+}
+
+@keyframes recurbuy-checkout-success-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
